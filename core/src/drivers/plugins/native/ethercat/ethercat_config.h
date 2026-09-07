@@ -40,8 +40,7 @@
  * REAL32 and REAL64 are transported through the existing DWORD/LWORD buffers
  * (IEEE 754 bit patterns preserved by memcpy).
  */
-typedef enum
-{
+typedef enum {
     ECAT_DTYPE_UNKNOWN,
     ECAT_DTYPE_BOOL,
     ECAT_DTYPE_INT8,
@@ -76,8 +75,7 @@ typedef enum
  * Represents a single entry within a PDO (Process Data Object).
  * Entries with index "0x0000" are padding entries.
  */
-typedef struct
-{
+typedef struct {
     char index[12]; /* hex string e.g. "0x6000" */
     uint8_t subindex;
     uint8_t bit_length;
@@ -91,8 +89,7 @@ typedef struct
  * Contains the PDO index and its list of entries.
  * RxPDOs are written to the slave, TxPDOs are read from the slave.
  */
-typedef struct
-{
+typedef struct {
     char index[12]; /* hex string e.g. "0x1A00" */
     char name[ECAT_MAX_NAME_LEN];
     ecat_pdo_entry_t entries[ECAT_MAX_PDO_ENTRIES];
@@ -105,8 +102,7 @@ typedef struct
  * Defines an SDO (Service Data Object) parameter to be written
  * to a slave during configuration phase.
  */
-typedef struct
-{
+typedef struct {
     char index[12]; /* hex string e.g. "0x8000" */
     uint8_t subindex;
     double value;                 /* stored as double; cast to target type at write time */
@@ -121,8 +117,7 @@ typedef struct
  * Maps a physical I/O channel to an IEC 61131-3 located variable.
  * Links the channel to its corresponding PDO entry.
  */
-typedef struct
-{
+typedef struct {
     int index;
     char name[ECAT_MAX_NAME_LEN];
     char type[20]; /* "digital_input", "analog_output", etc. */
@@ -139,8 +134,7 @@ typedef struct
  * Controls which identity fields are validated against the SOEM slave list
  * during topology verification.
  */
-typedef struct
-{
+typedef struct {
     bool check_vendor_id;
     bool check_product_code;
 } ecat_startup_checks_t;
@@ -150,8 +144,7 @@ typedef struct
  *
  * Controls slave addressing on the bus.
  */
-typedef struct
-{
+typedef struct {
     uint16_t ethercat_address; /* 0 = auto-assign */
 } ecat_addressing_t;
 
@@ -160,8 +153,7 @@ typedef struct
  *
  * Configurable timeouts for SDO operations and state transitions.
  */
-typedef struct
-{
+typedef struct {
     int sdo_timeout_ms;           /* SDO operation timeout (default: 1000) */
     int init_to_preop_timeout_ms; /* INIT->PRE-OP timeout (default: 3000) */
     int safeop_to_op_timeout_ms;  /* SAFE-OP->OP timeout (default: 10000) */
@@ -172,8 +164,7 @@ typedef struct
  *
  * Controls Sync Manager and PDI watchdog behavior per slave.
  */
-typedef struct
-{
+typedef struct {
     bool sm_watchdog_enabled;  /* Sync Manager watchdog */
     int sm_watchdog_ms;        /* SM watchdog timeout (default: 100) */
     bool pdi_watchdog_enabled; /* PDI watchdog */
@@ -185,8 +176,7 @@ typedef struct
  *
  * Controls DC SYNC0/SYNC1 signal generation per slave.
  */
-typedef struct
-{
+typedef struct {
     bool enabled;
     int sync_unit_cycle_us; /* 0 = use master cycle */
     bool sync0_enabled;
@@ -204,8 +194,7 @@ typedef struct
  * including identity, channel mappings, PDOs, SDOs, and per-slave
  * settings for timeouts, watchdogs, and distributed clocks.
  */
-typedef struct
-{
+typedef struct {
     int position; /* ec_slave[position] in SOEM (1-based) */
     char name[ECAT_MAX_NAME_LEN];
     char type[20]; /* "coupler", "digital_input", etc. */
@@ -237,8 +226,7 @@ typedef struct
  *  \\Device\\NPF_{GUID} can reach ~55 characters. */
 #define ECAT_IFNAME_MAX 128
 
-typedef struct
-{
+typedef struct {
     char interface[ECAT_IFNAME_MAX];
     int cycle_time_us;
     int receive_timeout_us;
@@ -255,8 +243,7 @@ typedef struct
 /**
  * @brief Diagnostics configuration
  */
-typedef struct
-{
+typedef struct {
     bool log_connections;
     bool log_data_access;
     bool log_errors;
@@ -273,8 +260,7 @@ typedef struct
  * with nested PDOs. It must be allocated statically or on the heap -- never
  * on the stack, as it would overflow most thread stacks.
  */
-typedef struct
-{
+typedef struct {
     ecat_master_config_t master;
     ecat_slave_t slaves[ECAT_MAX_SLAVES];
     int slave_count;
@@ -321,8 +307,7 @@ void ecat_config_set_logger(plugin_logger_t *logger);
  * scan and test commands accept any name the underlying socket layer
  * accepts, including Windows NPF device paths like "\Device\NPF_{GUID}".
  */
-typedef enum
-{
+typedef enum {
     ECAT_IFACE_LINUX_STRICT, /* alfanum + '_' '-', starts alpha, len 1..15 */
     ECAT_IFACE_ANY_PLATFORM  /* Linux + Windows NPF chars '\' '{' '}' '.' */
 } ecat_iface_validate_mode_t;
@@ -417,8 +402,7 @@ ecat_data_type_t ecat_data_type_from_bit_length(int bits);
  *   RECOVERING -> ERROR (after max attempts)
  *   Any state -> STOPPED (via stop_loop)
  */
-typedef enum
-{
+typedef enum {
     ECAT_STATE_IDLE,          /* After init(), before start_loop()         */
     ECAT_STATE_SCANNING,      /* ecx_init + ecx_config_init               */
     ECAT_STATE_CONFIGURING,   /* SDO writes + PDO mapping                 */
@@ -432,8 +416,7 @@ typedef enum
 /**
  * @brief Per-slave status snapshot for monitoring
  */
-typedef struct
-{
+typedef struct {
     int position;
     char name[ECAT_MAX_NAME_LEN];
     uint16_t al_state; /* EC_STATE_* from SOEM                    */
@@ -474,8 +457,7 @@ typedef struct
  * each `ecat_master_instance_t`. See ethercat_iface_state.h for the
  * apply/revert API.
  */
-typedef struct
-{
+typedef struct {
     char iface[ECAT_IFNAME_MAX];
 
     /* NIC tuning -- ethtool -C (coalescing) */
@@ -523,8 +505,7 @@ typedef struct
  * at master start so the wall-clock smoothing stays consistent across
  * different cycle rates.
  */
-typedef struct
-{
+typedef struct {
     _Atomic(uint64_t) cycle_count;     /* total cycles executed              */
     _Atomic(uint64_t) wkc_error_count; /* total WKC errors (wkc < expected)  */
     _Atomic(uint64_t) noframe_count;   /* total EC_NOFRAME (-1) errors       */
@@ -562,8 +543,7 @@ typedef struct
 /**
  * @brief IEC 61131-3 data size qualifiers
  */
-typedef enum
-{
+typedef enum {
     IEC_SIZE_BIT,   /* X -- single bit   */
     IEC_SIZE_BYTE,  /* B -- 1 byte       */
     IEC_SIZE_WORD,  /* W -- 2 bytes      */
@@ -574,8 +554,7 @@ typedef enum
 /**
  * @brief IEC 61131-3 direction qualifiers
  */
-typedef enum
-{
+typedef enum {
     IEC_DIR_INPUT, /* I -- physical input  */
     IEC_DIR_OUTPUT /* Q -- physical output */
 } iec_dir_t;
@@ -583,8 +562,7 @@ typedef enum
 /**
  * @brief Parsed IEC location -- result of parsing a string like "%IX0.3"
  */
-typedef struct
-{
+typedef struct {
     iec_dir_t direction; /* I or Q            */
     iec_size_t size;     /* X, B, W, D, L     */
     int byte_index;      /* byte address       */
@@ -594,8 +572,7 @@ typedef struct
 /**
  * @brief Single entry in the channel map
  */
-typedef struct
-{
+typedef struct {
     /* IOmap side */
     size_t iomap_offset;  /* byte offset from IOmap base            */
     int iomap_bit_offset; /* bit offset within the byte (0-7)       */
@@ -611,8 +588,7 @@ typedef struct
 /**
  * @brief Complete channel map -- separate arrays for inputs and outputs
  */
-typedef struct
-{
+typedef struct {
     ecat_channel_map_entry_t inputs[ECAT_MAX_MAP_ENTRIES];
     int input_count;
     ecat_channel_map_entry_t outputs[ECAT_MAX_MAP_ENTRIES];
@@ -622,8 +598,7 @@ typedef struct
 /**
  * @brief Single pre-resolved transfer entry
  */
-typedef struct
-{
+typedef struct {
     void *plc_ptr;        /* direct pointer to the PLC variable        */
     size_t iomap_offset;  /* byte offset from IOmap base               */
     int iomap_bit_offset; /* bit offset within the byte (0-7)          */
@@ -641,8 +616,7 @@ typedef struct
 /**
  * @brief Complete transfer list -- separate arrays for inputs and outputs
  */
-typedef struct
-{
+typedef struct {
     ecat_transfer_entry_t inputs[ECAT_MAX_MAP_ENTRIES];
     int input_count;
     ecat_transfer_entry_t outputs[ECAT_MAX_MAP_ENTRIES];
@@ -663,8 +637,7 @@ typedef struct
  * Must be heap-allocated (too large for stack: ~7MB per instance
  * due to the inline ecat_config_t slave array).
  */
-typedef struct
-{
+typedef struct {
     /* Identity */
     char name[ECAT_MAX_NAME_LEN]; /* master name from JSON config */
 

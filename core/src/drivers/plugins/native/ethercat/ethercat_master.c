@@ -61,20 +61,17 @@ int ecat_master_validate_topology(ecat_master_instance_t *inst, plugin_logger_t 
     const ecat_config_t *config = &inst->config;
     int found_count             = inst->ecx_context.slavecount;
 
-    if (found_count != config->slave_count)
-    {
+    if (found_count != config->slave_count) {
         plugin_logger_error(logger, "Topology mismatch: expected %d slaves, found %d on the bus",
                             config->slave_count, found_count);
         return -1;
     }
 
-    for (int i = 0; i < config->slave_count; i++)
-    {
+    for (int i = 0; i < config->slave_count; i++) {
         const ecat_slave_t *expected = &config->slaves[i];
         int pos                      = expected->position;
 
-        if (pos < 1 || pos > found_count)
-        {
+        if (pos < 1 || pos > found_count) {
             plugin_logger_error(logger, "Slave %d: position %d is out of range (1-%d)", i, pos,
                                 found_count);
             return -1;
@@ -83,10 +80,8 @@ int ecat_master_validate_topology(ecat_master_instance_t *inst, plugin_logger_t 
         ec_slavet *found = &inst->ecx_context.slavelist[pos];
 
         /* Vendor ID check (can be disabled per slave via startup_checks) */
-        if (expected->startup_checks.check_vendor_id)
-        {
-            if (found->eep_man != expected->vendor_id)
-            {
+        if (expected->startup_checks.check_vendor_id) {
+            if (found->eep_man != expected->vendor_id) {
                 plugin_logger_error(logger,
                                     "Slave %d (%s) at position %d: vendor_id mismatch - "
                                     "expected 0x%08X, found 0x%08X",
@@ -94,17 +89,14 @@ int ecat_master_validate_topology(ecat_master_instance_t *inst, plugin_logger_t 
                 return -1;
             }
         }
-        else
-        {
+        else {
             plugin_logger_debug(logger, "Slave %d (%s) at position %d: vendor_id check disabled", i,
                                 expected->name, pos);
         }
 
         /* Product code check (can be disabled per slave via startup_checks) */
-        if (expected->startup_checks.check_product_code)
-        {
-            if (found->eep_id != expected->product_code)
-            {
+        if (expected->startup_checks.check_product_code) {
+            if (found->eep_id != expected->product_code) {
                 plugin_logger_error(logger,
                                     "Slave %d (%s) at position %d: product_code mismatch - "
                                     "expected 0x%08X, found 0x%08X",
@@ -112,8 +104,7 @@ int ecat_master_validate_topology(ecat_master_instance_t *inst, plugin_logger_t 
                 return -1;
             }
         }
-        else
-        {
+        else {
             plugin_logger_debug(logger, "Slave %d (%s) at position %d: product_code check disabled",
                                 i, expected->name, pos);
         }
@@ -151,8 +142,7 @@ int ecat_master_open_and_scan(ecat_master_instance_t *inst, plugin_logger_t *log
     /* Step 1: Initialize SOEM on the configured network interface */
     plugin_logger_info(logger, "Opening network interface: %s", config->master.interface);
 
-    if (!ecx_init(&inst->ecx_context, config->master.interface))
-    {
+    if (!ecx_init(&inst->ecx_context, config->master.interface)) {
 #if defined(__CYGWIN__) || defined(_WIN32)
         plugin_logger_error(logger,
                             "Failed to initialize EtherCAT interface '%s'. "
@@ -180,14 +170,11 @@ int ecat_master_open_and_scan(ecat_master_instance_t *inst, plugin_logger_t *log
     {
         int busy_us = ECAT_BUSY_POLL_US;
         int sockfd  = inst->ecx_context.port.sockhandle;
-        if (sockfd >= 0)
-        {
-            if (setsockopt(sockfd, SOL_SOCKET, SO_BUSY_POLL, &busy_us, sizeof(busy_us)) == 0)
-            {
+        if (sockfd >= 0) {
+            if (setsockopt(sockfd, SOL_SOCKET, SO_BUSY_POLL, &busy_us, sizeof(busy_us)) == 0) {
                 plugin_logger_info(logger, "SO_BUSY_POLL enabled on socket (poll=%d us)", busy_us);
             }
-            else
-            {
+            else {
                 plugin_logger_debug(
                     logger, "SO_BUSY_POLL not supported (kernel may need CONFIG_NET_RX_BUSY_POLL)");
             }
@@ -198,8 +185,7 @@ int ecat_master_open_and_scan(ecat_master_instance_t *inst, plugin_logger_t *log
     /* Step 2: Scan the bus and enumerate slaves */
     plugin_logger_info(logger, "Scanning EtherCAT bus...");
 
-    if (ecx_config_init(&inst->ecx_context) <= 0)
-    {
+    if (ecx_config_init(&inst->ecx_context) <= 0) {
         plugin_logger_error(logger,
                             "No EtherCAT slaves found on interface '%s'. "
                             "Check cable connections and slave power.",
@@ -212,16 +198,14 @@ int ecat_master_open_and_scan(ecat_master_instance_t *inst, plugin_logger_t *log
     plugin_logger_info(logger, "Found %d slave(s) on the bus", inst->ecx_context.slavecount);
 
     /* Log discovered slaves */
-    for (int i = 1; i <= inst->ecx_context.slavecount; i++)
-    {
+    for (int i = 1; i <= inst->ecx_context.slavecount; i++) {
         ec_slavet *slave = &inst->ecx_context.slavelist[i];
         plugin_logger_info(logger, "  [%d] %s - vendor=0x%08X, product=0x%08X, rev=0x%08X", i,
                            slave->name, slave->eep_man, slave->eep_id, slave->eep_rev);
     }
 
     /* Step 3: Validate topology against JSON configuration */
-    if (ecat_master_validate_topology(inst, logger) != 0)
-    {
+    if (ecat_master_validate_topology(inst, logger) != 0) {
         plugin_logger_error(logger, "Topology validation failed - aborting master initialization");
         ecx_close(&inst->ecx_context);
         inst->soem_initialized = 0;
@@ -237,8 +221,7 @@ int ecat_master_open_and_scan(ecat_master_instance_t *inst, plugin_logger_t *log
     plugin_logger_info(logger, "Waiting for slaves to reach PRE-OP state...");
 
     int max_preop_timeout_us = 0;
-    for (int i = 0; i < config->slave_count; i++)
-    {
+    for (int i = 0; i < config->slave_count; i++) {
         int t_us = config->slaves[i].timeouts.init_to_preop_timeout_ms * 1000;
         if (t_us > max_preop_timeout_us)
             max_preop_timeout_us = t_us;
@@ -251,11 +234,9 @@ int ecat_master_open_and_scan(ecat_master_instance_t *inst, plugin_logger_t *log
     ecx_readstate(&inst->ecx_context);
 
     int all_preop = 1;
-    for (int i = 1; i <= inst->ecx_context.slavecount; i++)
-    {
+    for (int i = 1; i <= inst->ecx_context.slavecount; i++) {
         ec_slavet *slave = &inst->ecx_context.slavelist[i];
-        if (slave->state < EC_STATE_PRE_OP)
-        {
+        if (slave->state < EC_STATE_PRE_OP) {
             plugin_logger_error(
                 logger, "Slave %d (%s) failed to reach PRE-OP (state=0x%04X, ALstatus=0x%04X)", i,
                 slave->name, slave->state, slave->ALstatuscode);
@@ -263,8 +244,7 @@ int ecat_master_open_and_scan(ecat_master_instance_t *inst, plugin_logger_t *log
         }
     }
 
-    if (!all_preop)
-    {
+    if (!all_preop) {
         plugin_logger_error(logger, "Not all slaves reached PRE-OP - aborting");
         ecx_close(&inst->ecx_context);
         inst->soem_initialized = 0;
@@ -304,14 +284,12 @@ static int encode_sdo_value(ecat_data_type_t dt, double in, uint8_t out[8])
 
     memset(out, 0, 8);
 
-    if (dt == ECAT_DTYPE_REAL32)
-    {
+    if (dt == ECAT_DTYPE_REAL32) {
         float v = (float)in;
         memcpy(out, &v, sizeof(v));
         return 4;
     }
-    if (dt == ECAT_DTYPE_REAL64)
-    {
+    if (dt == ECAT_DTYPE_REAL64) {
         memcpy(out, &in, sizeof(in));
         return 8;
     }
@@ -327,14 +305,12 @@ int ecat_master_write_sdos(ecat_master_instance_t *inst, int slave_pos,
                            const ecat_sdo_config_t *sdos, int sdo_count, int sdo_timeout_ms,
                            plugin_logger_t *logger)
 {
-    if (!inst->soem_initialized)
-    {
+    if (!inst->soem_initialized) {
         plugin_logger_error(logger, "Cannot write SDOs: SOEM not initialized");
         return -1;
     }
 
-    if (slave_pos < 1 || slave_pos > inst->ecx_context.slavecount)
-    {
+    if (slave_pos < 1 || slave_pos > inst->ecx_context.slavecount) {
         plugin_logger_error(logger, "Invalid slave position %d for SDO write", slave_pos);
         return -1;
     }
@@ -345,8 +321,7 @@ int ecat_master_write_sdos(ecat_master_instance_t *inst, int slave_pos,
     /* Slaves without CoE mailbox cannot accept SDO writes; refuse early
      * with a clear message instead of letting every ecx_SDOwrite return
      * wkc=0. */
-    if ((inst->ecx_context.slavelist[slave_pos].mbx_proto & 0x04) == 0)
-    {
+    if ((inst->ecx_context.slavelist[slave_pos].mbx_proto & 0x04) == 0) {
         plugin_logger_error(logger,
                             "Slave %d: %d SDO(s) configured but slave does not support CoE mailbox",
                             slave_pos, sdo_count);
@@ -356,8 +331,7 @@ int ecat_master_write_sdos(ecat_master_instance_t *inst, int slave_pos,
     int written            = 0;
     int best_effort_failed = 0;
 
-    for (int i = 0; i < sdo_count; i++)
-    {
+    for (int i = 0; i < sdo_count; i++) {
         const ecat_sdo_config_t *sdo = &sdos[i];
 
         /* Parse index from hex string */
@@ -370,8 +344,7 @@ int ecat_master_write_sdos(ecat_master_instance_t *inst, int slave_pos,
         ecat_data_type_t dt = sdo->parsed_type;
         uint8_t value_buf[8];
         int size = encode_sdo_value(dt, sdo->value, value_buf);
-        if (size <= 0)
-        {
+        if (size <= 0) {
             plugin_logger_error(
                 logger,
                 "Slave %d SDO 0x%04X:%d: unknown data type '%s' -- skipping (parser regression?)",
@@ -380,13 +353,11 @@ int ecat_master_write_sdos(ecat_master_instance_t *inst, int slave_pos,
         }
 
         const char *dt_name = ecat_data_type_to_string(dt);
-        if (dt == ECAT_DTYPE_REAL32 || dt == ECAT_DTYPE_REAL64)
-        {
+        if (dt == ECAT_DTYPE_REAL32 || dt == ECAT_DTYPE_REAL64) {
             plugin_logger_debug(logger, "Slave %d: writing SDO 0x%04X:%d = %g (%s, %d bytes)",
                                 slave_pos, index, sdo->subindex, sdo->value, dt_name, size);
         }
-        else
-        {
+        else {
             plugin_logger_debug(logger, "Slave %d: writing SDO 0x%04X:%d = %lld (%s, %d bytes)",
                                 slave_pos, index, sdo->subindex, (long long)(int64_t)sdo->value,
                                 dt_name, size);
@@ -398,14 +369,12 @@ int ecat_master_write_sdos(ecat_master_instance_t *inst, int slave_pos,
         int wkc = ecx_SDOwrite(&inst->ecx_context, (uint16)slave_pos, index, sdo->subindex, FALSE,
                                size, value_buf, sdo_timeout_us);
 
-        if (wkc <= 0)
-        {
+        if (wkc <= 0) {
             /* Best-effort entries (type inferred from "bit_length" because
              * the editor exported an untyped record/array object) must not
              * take the slave -- and the whole master -- offline when the
              * device rejects them.  Warnings only. */
-            if (sdo->best_effort)
-            {
+            if (sdo->best_effort) {
                 plugin_logger_warn(logger,
                                    "Slave %d SDO 0x%04X:%d write failed (wkc=%d, name='%s') -- "
                                    "best-effort entry (type inferred from bit_length), continuing",
@@ -416,16 +385,14 @@ int ecat_master_write_sdos(ecat_master_instance_t *inst, int slave_pos,
             plugin_logger_warn(logger, "Slave %d SDO 0x%04X:%d write failed (wkc=%d, name='%s')",
                                slave_pos, index, sdo->subindex, wkc, sdo->name);
         }
-        else
-        {
+        else {
             plugin_logger_debug(logger, "Slave %d SDO 0x%04X:%d write OK (name='%s')", slave_pos,
                                 index, sdo->subindex, sdo->name);
             written++;
         }
     }
 
-    if (written + best_effort_failed < sdo_count)
-    {
+    if (written + best_effort_failed < sdo_count) {
         plugin_logger_warn(logger, "Slave %d: only %d/%d SDOs written successfully", slave_pos,
                            written, sdo_count);
         return -1;
@@ -478,14 +445,11 @@ static int ecat_master_configure_watchdog(ecat_master_instance_t *inst, int slav
     int wkc;
 
     /* SM watchdog register 0x0420 - only write if explicitly enabled. */
-    if (wd->sm_watchdog_enabled)
-    {
+    if (wd->sm_watchdog_enabled) {
         uint16_t sm_wd_ticks = 0;
-        if (wd->sm_watchdog_ms > 0)
-        {
+        if (wd->sm_watchdog_ms > 0) {
             int clamped_ms = wd->sm_watchdog_ms;
-            if (clamped_ms > max_watchdog_ms)
-            {
+            if (clamped_ms > max_watchdog_ms) {
                 plugin_logger_warn(logger,
                                    "Slave %d: SM watchdog %d ms exceeds max %d ms, clamping",
                                    slave_pos, wd->sm_watchdog_ms, max_watchdog_ms);
@@ -495,10 +459,8 @@ static int ecat_master_configure_watchdog(ecat_master_instance_t *inst, int slav
         }
         wkc = ecx_FPWR(&inst->ecx_context.port, configadr, 0x0420, sizeof(sm_wd_ticks),
                        &sm_wd_ticks, EC_TIMEOUTRET);
-        if (wkc <= 0)
-        {
-            if (strict)
-            {
+        if (wkc <= 0) {
+            if (strict) {
                 plugin_logger_error(
                     logger,
                     "Slave %d: failed to write SM watchdog register 0x0420 (wkc=%d) -- "
@@ -511,28 +473,23 @@ static int ecat_master_configure_watchdog(ecat_master_instance_t *inst, int slav
                 "Slave %d: SM watchdog write failed (wkc=%d), strict_sdo=false -- continuing",
                 slave_pos, wkc);
         }
-        else
-        {
+        else {
             plugin_logger_debug(logger, "Slave %d: SM watchdog enabled (ticks=%u, ~%d ms)",
                                 slave_pos, sm_wd_ticks, wd->sm_watchdog_ms);
         }
     }
-    else
-    {
+    else {
         plugin_logger_debug(logger, "Slave %d: SM watchdog disabled, skipping register write",
                             slave_pos);
     }
 
     /* PDI watchdog register 0x0402 - many slaves do not support this
      * register and return wkc=0 legitimately, so always best-effort. */
-    if (wd->pdi_watchdog_enabled)
-    {
+    if (wd->pdi_watchdog_enabled) {
         uint16_t pdi_wd_ticks = 0;
-        if (wd->pdi_watchdog_ms > 0)
-        {
+        if (wd->pdi_watchdog_ms > 0) {
             int clamped_ms = wd->pdi_watchdog_ms;
-            if (clamped_ms > max_watchdog_ms)
-            {
+            if (clamped_ms > max_watchdog_ms) {
                 plugin_logger_warn(logger,
                                    "Slave %d: PDI watchdog %d ms exceeds max %d ms, clamping",
                                    slave_pos, wd->pdi_watchdog_ms, max_watchdog_ms);
@@ -542,21 +499,18 @@ static int ecat_master_configure_watchdog(ecat_master_instance_t *inst, int slav
         }
         wkc = ecx_FPWR(&inst->ecx_context.port, configadr, 0x0402, sizeof(pdi_wd_ticks),
                        &pdi_wd_ticks, EC_TIMEOUTRET);
-        if (wkc <= 0)
-        {
+        if (wkc <= 0) {
             plugin_logger_warn(logger,
                                "Slave %d: PDI watchdog write returned wkc=%d (many slaves do not "
                                "support this register -- typically benign)",
                                slave_pos, wkc);
         }
-        else
-        {
+        else {
             plugin_logger_debug(logger, "Slave %d: PDI watchdog enabled (ticks=%u, ~%d ms)",
                                 slave_pos, pdi_wd_ticks, wd->pdi_watchdog_ms);
         }
     }
-    else
-    {
+    else {
         plugin_logger_debug(logger, "Slave %d: PDI watchdog disabled, skipping register write",
                             slave_pos);
     }
@@ -583,23 +537,20 @@ static void ecat_master_configure_dc(ecat_master_instance_t *inst, plugin_logger
     ecx_configdc(&inst->ecx_context);
 
     /* Step 2: Apply per-slave DC configuration */
-    for (int i = 0; i < config->slave_count; i++)
-    {
+    for (int i = 0; i < config->slave_count; i++) {
         const ecat_slave_t *slave = &config->slaves[i];
         int pos                   = slave->position;
 
         if (!slave->dc.enabled)
             continue;
 
-        if (pos < 1 || pos > inst->ecx_context.slavecount)
-        {
+        if (pos < 1 || pos > inst->ecx_context.slavecount) {
             plugin_logger_warn(logger, "Slave %d (%s): DC config skipped - position out of range",
                                pos, slave->name);
             continue;
         }
 
-        if (!inst->ecx_context.slavelist[pos].hasdc)
-        {
+        if (!inst->ecx_context.slavelist[pos].hasdc) {
             plugin_logger_warn(logger,
                                "Slave %d (%s): DC config requested but slave has no DC support",
                                pos, slave->name);
@@ -608,17 +559,14 @@ static void ecat_master_configure_dc(ecat_master_instance_t *inst, plugin_logger
 
         /* Determine cycle time: use slave-specific or fall back to master cycle */
         uint32_t cycle_ns;
-        if (slave->dc.sync_unit_cycle_us > 0)
-        {
+        if (slave->dc.sync_unit_cycle_us > 0) {
             cycle_ns = (uint32_t)(slave->dc.sync_unit_cycle_us * 1000);
         }
-        else
-        {
+        else {
             cycle_ns = (uint32_t)(config->master.cycle_time_us * 1000);
         }
 
-        if (slave->dc.sync0_enabled && slave->dc.sync1_enabled)
-        {
+        if (slave->dc.sync0_enabled && slave->dc.sync1_enabled) {
             /* Both SYNC0 and SYNC1 */
             uint32_t cycle0_ns = (slave->dc.sync0_cycle_us > 0)
                                      ? (uint32_t)(slave->dc.sync0_cycle_us * 1000)
@@ -635,8 +583,7 @@ static void ecat_master_configure_dc(ecat_master_instance_t *inst, plugin_logger
                                "(cycle0=%u ns, cycle1=%u ns, shift=%d ns)",
                                pos, slave->name, cycle0_ns, cycle1_ns, shift_ns);
         }
-        else if (slave->dc.sync0_enabled)
-        {
+        else if (slave->dc.sync0_enabled) {
             /* SYNC0 only */
             uint32_t sync0_ns = (slave->dc.sync0_cycle_us > 0)
                                     ? (uint32_t)(slave->dc.sync0_cycle_us * 1000)
@@ -648,8 +595,7 @@ static void ecat_master_configure_dc(ecat_master_instance_t *inst, plugin_logger
             plugin_logger_info(logger, "Slave %d (%s): DC SYNC0 enabled (cycle=%u ns, shift=%d ns)",
                                pos, slave->name, sync0_ns, shift_ns);
         }
-        else
-        {
+        else {
             /* DC enabled but no SYNC signals - just log it */
             plugin_logger_debug(logger, "Slave %d (%s): DC enabled but no SYNC signals configured",
                                 pos, slave->name);
@@ -686,12 +632,10 @@ static int assign_pdo_objects(ecx_contextt *context, int slave_pos, uint16 index
     /* Parse the numeric index of a PDO object ("0x1680" -> 0x1680). */
     uint16_t raw[ECAT_MAX_PDOS];
     int n = 0;
-    for (int i = 0; i < pdo_count && n < ECAT_MAX_PDOS; i++)
-    {
+    for (int i = 0; i < pdo_count && n < ECAT_MAX_PDOS; i++) {
         char *end       = NULL;
         unsigned long v = strtoul(pdos[i].index, &end, 16);
-        if (end == pdos[i].index || *end != '\0' || v == 0 || v > 0xFFFF)
-        {
+        if (end == pdos[i].index || *end != '\0' || v == 0 || v > 0xFFFF) {
             /* Padding / placeholder PDO entry (index "0x0000") -- skip it,
              * the editor emits these as alignment markers. */
             plugin_logger_debug(logger, "Slave %d: skipping PDO entry with invalid index '%s'",
@@ -703,27 +647,23 @@ static int assign_pdo_objects(ecx_contextt *context, int slave_pos, uint16 index
 
     /* Clear the current assignment. */
     uint16_t zero = 0;
-    if (ecx_SDOwrite(context, (uint16)slave_pos, index, 0, FALSE, 2, &zero, timeout) <= 0)
-    {
+    if (ecx_SDOwrite(context, (uint16)slave_pos, index, 0, FALSE, 2, &zero, timeout) <= 0) {
         plugin_logger_warn(logger, "Slave %d: failed to clear PDO assignment 0x%04X", slave_pos,
                            index);
         return -1;
     }
 
     /* Write each PDO object index, then the entry count. */
-    for (int i = 0; i < n; i++)
-    {
+    for (int i = 0; i < n; i++) {
         if (ecx_SDOwrite(context, (uint16)slave_pos, index, (uint8_t)(i + 1), FALSE, 2, &raw[i],
-                         timeout) <= 0)
-        {
+                         timeout) <= 0) {
             plugin_logger_error(logger, "Slave %d: failed to assign PDO 0x%04X to 0x%04X sub %d",
                                 slave_pos, raw[i], index, i + 1);
             return -1;
         }
     }
     uint16_t count = (uint16_t)n;
-    if (ecx_SDOwrite(context, (uint16)slave_pos, index, 0, FALSE, 2, &count, timeout) <= 0)
-    {
+    if (ecx_SDOwrite(context, (uint16)slave_pos, index, 0, FALSE, 2, &count, timeout) <= 0) {
         plugin_logger_error(logger, "Slave %d: failed to commit PDO assignment count for 0x%04X",
                             slave_pos, index);
         return -1;
@@ -755,8 +695,7 @@ static void program_pdo_mapping_object(ecx_contextt *ctx, int pos, const ecat_pd
 
     uint32_t packed[ECAT_MAX_PDO_ENTRIES];
     int n = 0;
-    for (int k = 0; k < pdo->entry_count && k < ECAT_MAX_PDO_ENTRIES; k++)
-    {
+    for (int k = 0; k < pdo->entry_count && k < ECAT_MAX_PDO_ENTRIES; k++) {
         const ecat_pdo_entry_t *e = &pdo->entries[k];
         char *eend                = NULL;
         unsigned long eidx        = strtoul(e->index, &eend, 16);
@@ -771,16 +710,13 @@ static void program_pdo_mapping_object(ecx_contextt *ctx, int pos, const ecat_pd
     uint16_t zero  = 0;
     uint16_t count = (uint16_t)n;
 
-    if (ecx_SDOwrite(ctx, (uint16)pos, index, 0, FALSE, 2, &zero, timeout) <= 0)
-    {
+    if (ecx_SDOwrite(ctx, (uint16)pos, index, 0, FALSE, 2, &zero, timeout) <= 0) {
         plugin_logger_warn(logger, "Slave %d: PDO map 0x%04X clear failed -- skipping", pos, index);
         return;
     }
-    for (int k = 0; k < n; k++)
-    {
+    for (int k = 0; k < n; k++) {
         uint32_t val = packed[k];
-        if (ecx_SDOwrite(ctx, (uint16)pos, index, (uint8_t)(k + 1), FALSE, 4, &val, timeout) <= 0)
-        {
+        if (ecx_SDOwrite(ctx, (uint16)pos, index, (uint8_t)(k + 1), FALSE, 4, &val, timeout) <= 0) {
             plugin_logger_warn(logger,
                                "Slave %d: PDO map 0x%04X entry %d write failed -- mapping may be "
                                "incomplete",
@@ -788,8 +724,7 @@ static void program_pdo_mapping_object(ecx_contextt *ctx, int pos, const ecat_pd
             return;
         }
     }
-    if (ecx_SDOwrite(ctx, (uint16)pos, index, 0, FALSE, 2, &count, timeout) <= 0)
-    {
+    if (ecx_SDOwrite(ctx, (uint16)pos, index, 0, FALSE, 2, &count, timeout) <= 0) {
         plugin_logger_warn(logger, "Slave %d: PDO map 0x%04X count commit failed", pos, index);
         return;
     }
@@ -808,8 +743,7 @@ static void program_pdo_mapping_object(ecx_contextt *ctx, int pos, const ecat_pd
  * mapping at PRE-OP->SAFE-OP (and afterwards zeroes the objects again). */
 static void add_pdo_index(ecat_pdo_t *list, int *count, uint16 index)
 {
-    for (int k = 0; k < *count; k++)
-    {
+    for (int k = 0; k < *count; k++) {
         char *e = NULL;
         if ((unsigned long)strtoul(list[k].index, &e, 16) == index)
             return;
@@ -830,12 +764,10 @@ static bool pdo_object_populated(ecx_contextt *ctx, int pos, uint16 index)
     if (ecx_SDOread(ctx, (uint16)pos, index, 0, FALSE, &sz, &n0, timeout) <= 0)
         return false;
     int n = n0 < 4 ? n0 : 4;
-    for (int k = 1; k <= n; k++)
-    {
+    for (int k = 1; k <= n; k++) {
         uint32_t v = 0;
         int esz    = 4;
-        if (ecx_SDOread(ctx, (uint16)pos, index, (uint8_t)k, FALSE, &esz, &v, timeout) <= 0)
-        {
+        if (ecx_SDOread(ctx, (uint16)pos, index, (uint8_t)k, FALSE, &esz, &v, timeout) <= 0) {
             uint16_t v2 = 0;
             int esz2    = 2;
             if (ecx_SDOread(ctx, (uint16)pos, index, (uint8_t)k, FALSE, &esz2, &v2, timeout) > 0 &&
@@ -853,8 +785,7 @@ int ecat_master_configure(ecat_master_instance_t *inst, plugin_logger_t *logger)
 {
     const ecat_config_t *config = &inst->config;
 
-    if (!inst->soem_initialized)
-    {
+    if (!inst->soem_initialized) {
         plugin_logger_error(logger, "Cannot configure: SOEM not initialized");
         return -1;
     }
@@ -864,8 +795,7 @@ int ecat_master_configure(ecat_master_instance_t *inst, plugin_logger_t *logger)
      * (empty module PDO placeholders, for instance) then falls back to the
      * defaults so the master can still reach OPERATIONAL on the device's own
      * fixed process image. */
-    typedef struct
-    {
+    typedef struct {
         uint16_t rx[ECAT_MAX_PDOS];
         int rx_n;
         uint16_t tx[ECAT_MAX_PDOS];
@@ -874,8 +804,7 @@ int ecat_master_configure(ecat_master_instance_t *inst, plugin_logger_t *logger)
     } default_assign_t;
     default_assign_t defaults[ECAT_MAX_SLAVES];
     memset(defaults, 0, sizeof(defaults));
-    for (int i = 0; i < config->slave_count && i < ECAT_MAX_SLAVES; i++)
-    {
+    for (int i = 0; i < config->slave_count && i < ECAT_MAX_SLAVES; i++) {
         const ecat_slave_t *slave = &config->slaves[i];
         int pos                   = slave->position;
         if (pos < 1 || pos > inst->ecx_context.slavecount)
@@ -886,11 +815,9 @@ int ecat_master_configure(ecat_master_instance_t *inst, plugin_logger_t *logger)
         defaults[i].captured = true;
         uint16_t n0          = 0;
         int sz               = 2;
-        if (ecx_SDOread(&inst->ecx_context, (uint16)pos, 0x1C12, 0, FALSE, &sz, &n0, timeout) > 0)
-        {
+        if (ecx_SDOread(&inst->ecx_context, (uint16)pos, 0x1C12, 0, FALSE, &sz, &n0, timeout) > 0) {
             int n = n0 < ECAT_MAX_PDOS ? n0 : ECAT_MAX_PDOS;
-            for (int k = 1; k <= n; k++)
-            {
+            for (int k = 1; k <= n; k++) {
                 uint16_t v = 0;
                 int vsz    = 2;
                 if (ecx_SDOread(&inst->ecx_context, (uint16)pos, 0x1C12, (uint8_t)k, FALSE, &vsz,
@@ -900,11 +827,9 @@ int ecat_master_configure(ecat_master_instance_t *inst, plugin_logger_t *logger)
         }
         sz = 2;
         n0 = 0;
-        if (ecx_SDOread(&inst->ecx_context, (uint16)pos, 0x1C13, 0, FALSE, &sz, &n0, timeout) > 0)
-        {
+        if (ecx_SDOread(&inst->ecx_context, (uint16)pos, 0x1C13, 0, FALSE, &sz, &n0, timeout) > 0) {
             int n = n0 < ECAT_MAX_PDOS ? n0 : ECAT_MAX_PDOS;
-            for (int k = 1; k <= n; k++)
-            {
+            for (int k = 1; k <= n; k++) {
                 uint16_t v = 0;
                 int vsz    = 2;
                 if (ecx_SDOread(&inst->ecx_context, (uint16)pos, 0x1C13, (uint8_t)k, FALSE, &vsz,
@@ -917,8 +842,7 @@ int ecat_master_configure(ecat_master_instance_t *inst, plugin_logger_t *logger)
     /* Step 3.4: Program module PDO mapping objects (0x1690/0x1A90 ...) so the
      * slave's process image includes the configured entries.  Must run at
      * PRE-OP, before PDO assignment and SOEM mapping below. */
-    for (int i = 0; i < config->slave_count; i++)
-    {
+    for (int i = 0; i < config->slave_count; i++) {
         const ecat_slave_t *slave = &config->slaves[i];
         int pos                   = slave->position;
         if (pos < 1 || pos > inst->ecx_context.slavecount)
@@ -944,8 +868,7 @@ int ecat_master_configure(ecat_master_instance_t *inst, plugin_logger_t *logger)
      * which reproduces the IgH layout (0x1C12=[0x1680,0x1690],
      * 0x1C13=[0x1A80,0x1A81,0x1A90]).
      */
-    for (int i = 0; i < config->slave_count; i++)
-    {
+    for (int i = 0; i < config->slave_count; i++) {
         const ecat_slave_t *slave = &config->slaves[i];
         int pos                   = slave->position;
         if (pos < 1 || pos > inst->ecx_context.slavecount)
@@ -978,15 +901,13 @@ int ecat_master_configure(ecat_master_instance_t *inst, plugin_logger_t *logger)
                 add_pdo_index(txpdos, &tx_n, tx_fixed[k]);
 
         /* Configured (module) PDOs follow the fixed prefix. */
-        for (int k = 0; k < slave->rx_pdo_count; k++)
-        {
+        for (int k = 0; k < slave->rx_pdo_count; k++) {
             char *e         = NULL;
             unsigned long v = strtoul(slave->rx_pdos[k].index, &e, 16);
             if (e != slave->rx_pdos[k].index && v > 0 && v <= 0xFFFF)
                 add_pdo_index(rxpdos, &rx_n, (uint16)v);
         }
-        for (int k = 0; k < slave->tx_pdo_count; k++)
-        {
+        for (int k = 0; k < slave->tx_pdo_count; k++) {
             char *e         = NULL;
             unsigned long v = strtoul(slave->tx_pdos[k].index, &e, 16);
             if (e != slave->tx_pdos[k].index && v > 0 && v <= 0xFFFF)
@@ -1011,16 +932,14 @@ int ecat_master_configure(ecat_master_instance_t *inst, plugin_logger_t *logger)
     plugin_logger_info(logger, "Mapping process data...");
 
     int io_size = ecx_config_map_group(&inst->ecx_context, &inst->iomap, 0);
-    if (io_size <= 0)
-    {
+    if (io_size <= 0) {
         plugin_logger_error(logger,
                             "ecx_config_map_group returned %d -- process data mapping failed "
                             "(likely SII / mailbox issue)",
                             io_size);
         return -1;
     }
-    if (io_size > ECAT_IOMAP_SIZE)
-    {
+    if (io_size > ECAT_IOMAP_SIZE) {
         plugin_logger_error(logger, "IOmap overflow: need %d bytes, have %d", io_size,
                             ECAT_IOMAP_SIZE);
         return -1;
@@ -1033,8 +952,7 @@ int ecat_master_configure(ecat_master_instance_t *inst, plugin_logger_t *logger)
      * not fatal but worth surfacing. */
     ec_groupt *grp     = &inst->ecx_context.grouplist[0];
     uint32_t grp_total = (uint32_t)grp->Obytes + (uint32_t)grp->Ibytes;
-    if ((int)grp_total != io_size)
-    {
+    if ((int)grp_total != io_size) {
         plugin_logger_warn(logger,
                            "IOmap size mismatch: ecx returned %d but grp totals=%u "
                            "(Obytes=%d Ibytes=%d)",
@@ -1049,11 +967,9 @@ int ecat_master_configure(ecat_master_instance_t *inst, plugin_logger_t *logger)
      * the vendor master starts the module) must not take the bus down.  Restore
      * the captured device default assignment and re-map so the master can still
      * reach OPERATIONAL on the device's own fixed process image. */
-    if (grp->Obytes == 0 && grp->Ibytes == 0)
-    {
+    if (grp->Obytes == 0 && grp->Ibytes == 0) {
         bool restored = false;
-        for (int i = 0; i < config->slave_count && i < ECAT_MAX_SLAVES; i++)
-        {
+        for (int i = 0; i < config->slave_count && i < ECAT_MAX_SLAVES; i++) {
             const ecat_slave_t *slave = &config->slaves[i];
             int pos                   = slave->position;
             if (pos < 1 || pos > inst->ecx_context.slavecount)
@@ -1086,15 +1002,13 @@ int ecat_master_configure(ecat_master_instance_t *inst, plugin_logger_t *logger)
                 restored = true;
         }
 
-        if (restored)
-        {
+        if (restored) {
             plugin_logger_warn(logger,
                                "Config PDO assignment produced an empty process image -- restored "
                                "device default assignment and re-mapping");
             io_size = ecx_config_map_group(&inst->ecx_context, &inst->iomap, 0);
             grp     = &inst->ecx_context.grouplist[0];
-            if (io_size <= 0 || (grp->Obytes == 0 && grp->Ibytes == 0))
-            {
+            if (io_size <= 0 || (grp->Obytes == 0 && grp->Ibytes == 0)) {
                 plugin_logger_error(logger,
                                     "Re-map after default-assignment fallback still empty "
                                     "(io_size=%d) -- aborting startup",
@@ -1112,15 +1026,13 @@ int ecat_master_configure(ecat_master_instance_t *inst, plugin_logger_t *logger)
      * a slave that wants strict SDO writes also wants strict SM watchdog
      * writes; both are critical configuration the operator pinned in JSON. */
     plugin_logger_info(logger, "Configuring per-slave watchdogs...");
-    for (int i = 0; i < config->slave_count; i++)
-    {
+    for (int i = 0; i < config->slave_count; i++) {
         const ecat_slave_t *slave = &config->slaves[i];
         int pos                   = slave->position;
         if (pos < 1 || pos > inst->ecx_context.slavecount)
             continue;
         if (ecat_master_configure_watchdog(inst, pos, &slave->watchdog, slave->strict_sdo,
-                                           logger) != 0)
-        {
+                                           logger) != 0) {
             plugin_logger_error(logger,
                                 "Master '%s': Slave %d (%s): SM watchdog config failed and "
                                 "strict_sdo=true -- aborting startup",
@@ -1141,8 +1053,7 @@ int ecat_master_apply_module_activation(ecat_master_instance_t *inst, plugin_log
     if (!inst->soem_initialized)
         return -1;
 
-    for (int i = 0; i < config->slave_count; i++)
-    {
+    for (int i = 0; i < config->slave_count; i++) {
         const ecat_slave_t *slave = &config->slaves[i];
         int pos                   = slave->position;
         if (pos < 1 || pos > inst->ecx_context.slavecount)
@@ -1154,8 +1065,7 @@ int ecat_master_apply_module_activation(ecat_master_instance_t *inst, plugin_log
          * once, after OPERATIONAL. */
         ecat_sdo_config_t act[64];
         int n = 0;
-        for (int k = 0; k < slave->sdo_count && n < (int)(sizeof(act) / sizeof(act[0])); k++)
-        {
+        for (int k = 0; k < slave->sdo_count && n < (int)(sizeof(act) / sizeof(act[0])); k++) {
             const ecat_sdo_config_t *s = &slave->sdo_configs[k];
             char *eend                 = NULL;
             unsigned long idx          = strtoul(s->index, &eend, 16);
@@ -1189,16 +1099,14 @@ int ecat_master_transition_to_op(ecat_master_instance_t *inst, plugin_logger_t *
 {
     const ecat_config_t *config = &inst->config;
 
-    if (!inst->soem_initialized)
-    {
+    if (!inst->soem_initialized) {
         plugin_logger_error(logger, "Cannot transition: SOEM not initialized");
         return -1;
     }
 
     /* Compute maximum SAFE-OP->OP timeout across all configured slaves */
     int max_safeop_timeout_us = 0;
-    for (int i = 0; i < config->slave_count; i++)
-    {
+    for (int i = 0; i < config->slave_count; i++) {
         int t_us = config->slaves[i].timeouts.safeop_to_op_timeout_ms * 1000;
         if (t_us > max_safeop_timeout_us)
             max_safeop_timeout_us = t_us;
@@ -1214,17 +1122,14 @@ int ecat_master_transition_to_op(ecat_master_instance_t *inst, plugin_logger_t *
 
     /* Read back actual states */
     ecx_readstate(&inst->ecx_context);
-    if (inst->ecx_context.slavelist[0].state != EC_STATE_SAFE_OP)
-    {
+    if (inst->ecx_context.slavelist[0].state != EC_STATE_SAFE_OP) {
         plugin_logger_error(logger, "Not all slaves reached SAFE_OP state (current state: 0x%04X)",
                             inst->ecx_context.slavelist[0].state);
 
         /* Log individual slave states for debugging */
-        for (int i = 1; i <= inst->ecx_context.slavecount; i++)
-        {
+        for (int i = 1; i <= inst->ecx_context.slavecount; i++) {
             ec_slavet *slave = &inst->ecx_context.slavelist[i];
-            if (slave->state != EC_STATE_SAFE_OP)
-            {
+            if (slave->state != EC_STATE_SAFE_OP) {
                 plugin_logger_error(logger, "  Slave %d (%s): state=0x%04X, ALstatuscode=0x%04X", i,
                                     slave->name, slave->state, slave->ALstatuscode);
             }
@@ -1256,11 +1161,9 @@ int ecat_master_transition_to_op(ecat_master_instance_t *inst, plugin_logger_t *
      * SM2 rearmed throughout the SAFE-OP -> OP poll, regardless of how
      * generous safeop_to_op_timeout_ms is set per slave. */
     int min_sm_wd_us = 0;
-    for (int i = 0; i < config->slave_count; i++)
-    {
+    for (int i = 0; i < config->slave_count; i++) {
         const ecat_watchdog_t *wd = &config->slaves[i].watchdog;
-        if (wd->sm_watchdog_enabled && wd->sm_watchdog_ms > 0)
-        {
+        if (wd->sm_watchdog_enabled && wd->sm_watchdog_ms > 0) {
             int wd_us = wd->sm_watchdog_ms * 1000;
             if (min_sm_wd_us == 0 || wd_us < min_sm_wd_us)
                 min_sm_wd_us = wd_us;
@@ -1287,21 +1190,18 @@ int ecat_master_transition_to_op(ecat_master_instance_t *inst, plugin_logger_t *
                         poll_timeout_us, retries, min_sm_wd_us);
 
     int op_reached = 0;
-    for (int retry = 0; retry < retries; retry++)
-    {
+    for (int retry = 0; retry < retries; retry++) {
         ecx_send_processdata(&inst->ecx_context);
         ecx_receive_processdata(&inst->ecx_context, EC_TIMEOUTRET);
         ecx_statecheck(&inst->ecx_context, 0, EC_STATE_OPERATIONAL, poll_timeout_us);
 
-        if (inst->ecx_context.slavelist[0].state == EC_STATE_OPERATIONAL)
-        {
+        if (inst->ecx_context.slavelist[0].state == EC_STATE_OPERATIONAL) {
             op_reached = 1;
             break;
         }
     }
 
-    if (!op_reached)
-    {
+    if (!op_reached) {
         plugin_logger_error(logger,
                             "Not all slaves reached OPERATIONAL state after %d retries "
                             "(poll_timeout=%d us)",
@@ -1309,11 +1209,9 @@ int ecat_master_transition_to_op(ecat_master_instance_t *inst, plugin_logger_t *
 
         /* Log individual slave states for debugging */
         ecx_readstate(&inst->ecx_context);
-        for (int i = 1; i <= inst->ecx_context.slavecount; i++)
-        {
+        for (int i = 1; i <= inst->ecx_context.slavecount; i++) {
             ec_slavet *slave = &inst->ecx_context.slavelist[i];
-            if (slave->state != EC_STATE_OPERATIONAL)
-            {
+            if (slave->state != EC_STATE_OPERATIONAL) {
                 plugin_logger_error(logger, "  Slave %d (%s): state=0x%04X, ALstatuscode=0x%04X", i,
                                     slave->name, slave->state, slave->ALstatuscode);
             }
@@ -1336,22 +1234,19 @@ int ecat_master_transition_to_op(ecat_master_instance_t *inst, plugin_logger_t *
 
 void ecat_master_close(ecat_master_instance_t *inst, plugin_logger_t *logger)
 {
-    if (inst->soem_initialized)
-    {
+    if (inst->soem_initialized) {
         /* Step 1: drive outputs to zero before the transition (safe-close).
          * For drives, valves and active-high IO this leaves the slave in a
          * safe state immediately, before its SM watchdog has a chance to
          * fire.  Skip when there is no IOmap yet (close on early-startup
          * failure path). */
-        if (inst->config.master.safe_close && inst->iomap_used_size > 0)
-        {
+        if (inst->config.master.safe_close && inst->iomap_used_size > 0) {
             plugin_logger_info(logger,
                                "Zeroing outputs and sending final processdata before close");
             memset(inst->iomap, 0, inst->iomap_used_size);
             ecx_send_processdata(&inst->ecx_context);
             int wkc = ecx_receive_processdata(&inst->ecx_context, EC_TIMEOUTRET);
-            if (wkc <= 0)
-            {
+            if (wkc <= 0) {
                 plugin_logger_warn(logger,
                                    "Final processdata returned wkc=%d -- outputs may not have "
                                    "reached slaves; falling back to slave SM watchdog",
@@ -1365,24 +1260,20 @@ void ecat_master_close(ecat_master_instance_t *inst, plugin_logger_t *logger)
         plugin_logger_info(logger, "Transitioning slaves to INIT state...");
         inst->ecx_context.slavelist[0].state = EC_STATE_INIT;
         int init_wkc                         = ecx_writestate(&inst->ecx_context, 0);
-        if (init_wkc <= 0)
-        {
+        if (init_wkc <= 0) {
             plugin_logger_error(logger,
                                 "writestate(INIT) returned wkc=%d -- slaves may remain in "
                                 "OP/SAFE-OP until their SM watchdog expires",
                                 init_wkc);
         }
-        else
-        {
+        else {
             /* Short timeout -- not worth waiting safeop_to_op here. */
             ecx_statecheck(&inst->ecx_context, 0, EC_STATE_INIT, EC_TIMEOUTSTATE);
             ecx_readstate(&inst->ecx_context);
             int stuck = 0;
-            for (int i = 1; i <= inst->ecx_context.slavecount; i++)
-            {
+            for (int i = 1; i <= inst->ecx_context.slavecount; i++) {
                 uint16_t st = inst->ecx_context.slavelist[i].state;
-                if (st != EC_STATE_INIT)
-                {
+                if (st != EC_STATE_INIT) {
                     plugin_logger_warn(logger,
                                        "Slave %d (%s): did not reach INIT (state=0x%04X) -- "
                                        "fallback to slave SM watchdog",
@@ -1390,8 +1281,7 @@ void ecat_master_close(ecat_master_instance_t *inst, plugin_logger_t *logger)
                     stuck++;
                 }
             }
-            if (stuck == 0)
-            {
+            if (stuck == 0) {
                 plugin_logger_info(logger, "All slaves confirmed in INIT");
             }
         }
@@ -1468,8 +1358,7 @@ static int writestate_with_check(ecat_master_instance_t *inst, int position, uin
 {
     inst->ecx_context.slavelist[position].state = target_state;
     int wkc = ecx_writestate(&inst->ecx_context, (uint16)position);
-    if (wkc <= 0)
-    {
+    if (wkc <= 0) {
         atomic_fetch_add_explicit(&inst->recovery_writestate_failures, 1, memory_order_relaxed);
         plugin_logger_warn(logger,
                            "Slave %d (%s): writestate(0x%04X) wkc=%d -- request did not "
@@ -1481,8 +1370,7 @@ static int writestate_with_check(ecat_master_instance_t *inst, int position, uin
 
 int ecat_master_recover_slave(ecat_master_instance_t *inst, int position, plugin_logger_t *logger)
 {
-    if (position < 1 || position > inst->ecx_context.slavecount)
-    {
+    if (position < 1 || position > inst->ecx_context.slavecount) {
         plugin_logger_error(logger, "Invalid slave position %d for recovery", position);
         return -1;
     }
@@ -1490,14 +1378,12 @@ int ecat_master_recover_slave(ecat_master_instance_t *inst, int position, plugin
     ec_slavet *slave       = &inst->ecx_context.slavelist[position];
     uint16_t current_state = slave->state;
 
-    if (current_state == EC_STATE_OPERATIONAL)
-    {
+    if (current_state == EC_STATE_OPERATIONAL) {
         /* Already operational */
         return 1;
     }
 
-    if (current_state == (EC_STATE_SAFE_OP + EC_STATE_ERROR))
-    {
+    if (current_state == (EC_STATE_SAFE_OP + EC_STATE_ERROR)) {
         /* SAFE_OP + ERROR: ACK the error, then request OP */
         plugin_logger_info(logger, "Slave %d (%s): SAFE_OP+ERROR (ALstatus=0x%04X), sending ACK",
                            position, slave->name, slave->ALstatuscode);
@@ -1510,16 +1396,14 @@ int ecat_master_recover_slave(ecat_master_instance_t *inst, int position, plugin
         /* Check if it worked */
         ecx_statecheck(&inst->ecx_context, (uint16)position, EC_STATE_OPERATIONAL, EC_TIMEOUTRET);
 
-        if (slave->state == EC_STATE_OPERATIONAL)
-        {
+        if (slave->state == EC_STATE_OPERATIONAL) {
             plugin_logger_info(logger, "Slave %d (%s): recovered to OP", position, slave->name);
             return 1;
         }
         return 0;
     }
 
-    if (current_state == EC_STATE_SAFE_OP)
-    {
+    if (current_state == EC_STATE_SAFE_OP) {
         /* SAFE_OP: just request OP */
         plugin_logger_info(logger, "Slave %d (%s): in SAFE_OP, requesting OP", position,
                            slave->name);
@@ -1528,22 +1412,19 @@ int ecat_master_recover_slave(ecat_master_instance_t *inst, int position, plugin
 
         ecx_statecheck(&inst->ecx_context, (uint16)position, EC_STATE_OPERATIONAL, EC_TIMEOUTRET);
 
-        if (slave->state == EC_STATE_OPERATIONAL)
-        {
+        if (slave->state == EC_STATE_OPERATIONAL) {
             plugin_logger_info(logger, "Slave %d (%s): recovered to OP", position, slave->name);
             return 1;
         }
         return 0;
     }
 
-    if (current_state > EC_STATE_NONE)
-    {
+    if (current_state > EC_STATE_NONE) {
         /* Lower state but still present: try full reconfiguration */
         plugin_logger_info(logger, "Slave %d (%s): state=0x%04X, attempting reconfig", position,
                            slave->name, current_state);
 
-        if (ecx_reconfig_slave(&inst->ecx_context, (uint16)position, EC_TIMEOUTRET))
-        {
+        if (ecx_reconfig_slave(&inst->ecx_context, (uint16)position, EC_TIMEOUTRET)) {
             slave->islost = FALSE;
             plugin_logger_info(logger, "Slave %d (%s): reconfigured", position, slave->name);
 
@@ -1558,11 +1439,9 @@ int ecat_master_recover_slave(ecat_master_instance_t *inst, int position, plugin
     }
 
     /* EC_STATE_NONE: slave is lost, try recover */
-    if (!slave->islost)
-    {
+    if (!slave->islost) {
         ecx_statecheck(&inst->ecx_context, (uint16)position, EC_STATE_OPERATIONAL, EC_TIMEOUTRET);
-        if (slave->state == EC_STATE_NONE)
-        {
+        if (slave->state == EC_STATE_NONE) {
             slave->islost = TRUE;
             plugin_logger_warn(logger, "Slave %d (%s): marked as lost", position, slave->name);
         }
@@ -1570,8 +1449,7 @@ int ecat_master_recover_slave(ecat_master_instance_t *inst, int position, plugin
     }
 
     /* Slave was marked lost - try to recover */
-    if (ecx_recover_slave(&inst->ecx_context, (uint16)position, EC_TIMEOUTRET))
-    {
+    if (ecx_recover_slave(&inst->ecx_context, (uint16)position, EC_TIMEOUTRET)) {
         slave->islost = FALSE;
         plugin_logger_info(logger, "Slave %d (%s): recovered from lost state", position,
                            slave->name);
