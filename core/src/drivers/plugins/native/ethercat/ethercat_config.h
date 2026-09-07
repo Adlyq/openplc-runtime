@@ -111,10 +111,7 @@ typedef struct
     uint8_t subindex;
     double value;                 /* stored as double; cast to target type at write time */
     ecat_data_type_t parsed_type; /* resolved from data_type string in JSON */
-    /* True when parsed_type was inferred from "bit_length" because the JSON
-     * carried an unrecognized data_type label (editor record/array exports).
-     * A failed write for such an entry is warned, never fatal. */
-    bool best_effort;
+    bool best_effort;             /* type inferred from bit_length; failed write not fatal */
     char name[ECAT_MAX_NAME_LEN];
 } ecat_sdo_config_t;
 
