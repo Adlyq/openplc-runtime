@@ -24,3 +24,6 @@ core/src/drivers/plugins/python/modbus_slave/modbus_slave_config.json
 core/src/drivers/plugins/python/modbus_master/modbus_master.json
 core/src/drivers/plugins/python/opcua/opcua.json
 core/src/drivers/plugins/native/s7comm/s7comm_config.json
+
+# Locally checked-out editor source tree (1.9G) -- not part of the runtime image
+/openplc-editor/

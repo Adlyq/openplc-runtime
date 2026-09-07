@@ -10,23 +10,27 @@
 #ifndef ETHERCAT_CONFIG_H
 #define ETHERCAT_CONFIG_H
 
+#include <pthread.h>
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdatomic.h>
-#include <pthread.h>
 
 #include "plugin_logger.h"
 #include "soem/soem.h"
 
 /* Maximum sizes */
-#define ECAT_MAX_MASTERS      4
-#define ECAT_MAX_SLAVES      64
-#define ECAT_IOMAP_SIZE    8192
-#define ECAT_MAX_CHANNELS    64
+#define ECAT_MAX_MASTERS 4
+#define ECAT_MAX_SLAVES 64
+#define ECAT_IOMAP_SIZE 8192
+#define ECAT_MAX_CHANNELS 64
 #define ECAT_MAX_PDO_ENTRIES 32
-#define ECAT_MAX_PDOS        16
-#define ECAT_MAX_SDOS        32
-#define ECAT_MAX_NAME_LEN    64
+#define ECAT_MAX_PDOS 16
+/* Editor exports can legitimately carry several hundred startup SDOs: a
+ * single slave (e.g. an ABB/Senmun IL EC 4A4BP IO-Link master) lists its
+ * whole CoE parameter set.  512 keeps every standard primitive + derived
+ * (custom ESI) entry without truncation on realistic devices. */
+#define ECAT_MAX_SDOS 512
+#define ECAT_MAX_NAME_LEN 64
 #define ECAT_MAX_IEC_LOC_LEN 16
 
 /**
@@ -36,7 +40,8 @@
  * REAL32 and REAL64 are transported through the existing DWORD/LWORD buffers
  * (IEEE 754 bit patterns preserved by memcpy).
  */
-typedef enum {
+typedef enum
+{
     ECAT_DTYPE_UNKNOWN,
     ECAT_DTYPE_BOOL,
     ECAT_DTYPE_INT8,
@@ -53,12 +58,17 @@ typedef enum {
 } ecat_data_type_t;
 
 /* Error codes */
-#define ECAT_CONFIG_OK              0
-#define ECAT_CONFIG_ERR_FILE       -1
-#define ECAT_CONFIG_ERR_PARSE      -2
-#define ECAT_CONFIG_ERR_MEMORY     -3
-#define ECAT_CONFIG_ERR_INVALID    -4
-#define ECAT_CONFIG_ERR_MISSING    -5
+#define ECAT_CONFIG_OK 0
+#define ECAT_CONFIG_ERR_FILE -1
+#define ECAT_CONFIG_ERR_PARSE -2
+#define ECAT_CONFIG_ERR_MEMORY -3
+#define ECAT_CONFIG_ERR_INVALID -4
+#define ECAT_CONFIG_ERR_MISSING -5
+
+/* Internal sentinel: parse_sdo could not represent this entry (e.g. a
+ * structured/array data_type) but the config should continue parsing with
+ * the entry omitted.  Never returned to public API callers. */
+#define ECAT_CONFIG_SKIP_ENTRY 1
 
 /**
  * @brief PDO entry definition
@@ -66,12 +76,13 @@ typedef enum {
  * Represents a single entry within a PDO (Process Data Object).
  * Entries with index "0x0000" are padding entries.
  */
-typedef struct {
-    char             index[12];        /* hex string e.g. "0x6000" */
-    uint8_t          subindex;
-    uint8_t          bit_length;
-    char             name[ECAT_MAX_NAME_LEN];
-    ecat_data_type_t parsed_type;      /* resolved from data_type string in JSON */
+typedef struct
+{
+    char index[12]; /* hex string e.g. "0x6000" */
+    uint8_t subindex;
+    uint8_t bit_length;
+    char name[ECAT_MAX_NAME_LEN];
+    ecat_data_type_t parsed_type; /* resolved from data_type string in JSON */
 } ecat_pdo_entry_t;
 
 /**
@@ -80,11 +91,12 @@ typedef struct {
  * Contains the PDO index and its list of entries.
  * RxPDOs are written to the slave, TxPDOs are read from the slave.
  */
-typedef struct {
-    char             index[12];  /* hex string e.g. "0x1A00" */
-    char             name[ECAT_MAX_NAME_LEN];
+typedef struct
+{
+    char index[12]; /* hex string e.g. "0x1A00" */
+    char name[ECAT_MAX_NAME_LEN];
     ecat_pdo_entry_t entries[ECAT_MAX_PDO_ENTRIES];
-    int              entry_count;
+    int entry_count;
 } ecat_pdo_t;
 
 /**
@@ -93,12 +105,17 @@ typedef struct {
  * Defines an SDO (Service Data Object) parameter to be written
  * to a slave during configuration phase.
  */
-typedef struct {
-    char             index[12];        /* hex string e.g. "0x8000" */
-    uint8_t          subindex;
-    double           value;            /* stored as double; cast to target type at write time */
-    ecat_data_type_t parsed_type;      /* resolved from data_type string in JSON */
-    char             name[ECAT_MAX_NAME_LEN];
+typedef struct
+{
+    char index[12]; /* hex string e.g. "0x8000" */
+    uint8_t subindex;
+    double value;                 /* stored as double; cast to target type at write time */
+    ecat_data_type_t parsed_type; /* resolved from data_type string in JSON */
+    /* True when parsed_type was inferred from "bit_length" because the JSON
+     * carried an unrecognized data_type label (editor record/array exports).
+     * A failed write for such an entry is warned, never fatal. */
+    bool best_effort;
+    char name[ECAT_MAX_NAME_LEN];
 } ecat_sdo_config_t;
 
 /**
@@ -107,15 +124,16 @@ typedef struct {
  * Maps a physical I/O channel to an IEC 61131-3 located variable.
  * Links the channel to its corresponding PDO entry.
  */
-typedef struct {
-    int      index;
-    char     name[ECAT_MAX_NAME_LEN];
-    char     type[20];         /* "digital_input", "analog_output", etc. */
-    uint8_t  bit_length;
-    char     iec_location[ECAT_MAX_IEC_LOC_LEN];
-    char     pdo_index[12];
-    char     pdo_entry_index[12];
-    uint8_t  pdo_entry_subindex;
+typedef struct
+{
+    int index;
+    char name[ECAT_MAX_NAME_LEN];
+    char type[20]; /* "digital_input", "analog_output", etc. */
+    uint8_t bit_length;
+    char iec_location[ECAT_MAX_IEC_LOC_LEN];
+    char pdo_index[12];
+    char pdo_entry_index[12];
+    uint8_t pdo_entry_subindex;
 } ecat_channel_t;
 
 /**
@@ -124,9 +142,10 @@ typedef struct {
  * Controls which identity fields are validated against the SOEM slave list
  * during topology verification.
  */
-typedef struct {
-    bool     check_vendor_id;
-    bool     check_product_code;
+typedef struct
+{
+    bool check_vendor_id;
+    bool check_product_code;
 } ecat_startup_checks_t;
 
 /**
@@ -134,8 +153,9 @@ typedef struct {
  *
  * Controls slave addressing on the bus.
  */
-typedef struct {
-    uint16_t ethercat_address;    /* 0 = auto-assign */
+typedef struct
+{
+    uint16_t ethercat_address; /* 0 = auto-assign */
 } ecat_addressing_t;
 
 /**
@@ -143,10 +163,11 @@ typedef struct {
  *
  * Configurable timeouts for SDO operations and state transitions.
  */
-typedef struct {
-    int      sdo_timeout_ms;           /* SDO operation timeout (default: 1000) */
-    int      init_to_preop_timeout_ms; /* INIT->PRE-OP timeout (default: 3000) */
-    int      safeop_to_op_timeout_ms;  /* SAFE-OP->OP timeout (default: 10000) */
+typedef struct
+{
+    int sdo_timeout_ms;           /* SDO operation timeout (default: 1000) */
+    int init_to_preop_timeout_ms; /* INIT->PRE-OP timeout (default: 3000) */
+    int safeop_to_op_timeout_ms;  /* SAFE-OP->OP timeout (default: 10000) */
 } ecat_timeouts_t;
 
 /**
@@ -154,11 +175,12 @@ typedef struct {
  *
  * Controls Sync Manager and PDI watchdog behavior per slave.
  */
-typedef struct {
-    bool     sm_watchdog_enabled;      /* Sync Manager watchdog */
-    int      sm_watchdog_ms;           /* SM watchdog timeout (default: 100) */
-    bool     pdi_watchdog_enabled;     /* PDI watchdog */
-    int      pdi_watchdog_ms;          /* PDI watchdog timeout (default: 100) */
+typedef struct
+{
+    bool sm_watchdog_enabled;  /* Sync Manager watchdog */
+    int sm_watchdog_ms;        /* SM watchdog timeout (default: 100) */
+    bool pdi_watchdog_enabled; /* PDI watchdog */
+    int pdi_watchdog_ms;       /* PDI watchdog timeout (default: 100) */
 } ecat_watchdog_t;
 
 /**
@@ -166,15 +188,16 @@ typedef struct {
  *
  * Controls DC SYNC0/SYNC1 signal generation per slave.
  */
-typedef struct {
-    bool     enabled;
-    int      sync_unit_cycle_us;       /* 0 = use master cycle */
-    bool     sync0_enabled;
-    int      sync0_cycle_us;
-    int      sync0_shift_us;
-    bool     sync1_enabled;
-    int      sync1_cycle_us;
-    int      sync1_shift_us;
+typedef struct
+{
+    bool enabled;
+    int sync_unit_cycle_us; /* 0 = use master cycle */
+    bool sync0_enabled;
+    int sync0_cycle_us;
+    int sync0_shift_us;
+    bool sync1_enabled;
+    int sync1_cycle_us;
+    int sync1_shift_us;
 } ecat_dc_config_t;
 
 /**
@@ -184,28 +207,29 @@ typedef struct {
  * including identity, channel mappings, PDOs, SDOs, and per-slave
  * settings for timeouts, watchdogs, and distributed clocks.
  */
-typedef struct {
-    int               position;        /* ec_slave[position] in SOEM (1-based) */
-    char              name[ECAT_MAX_NAME_LEN];
-    char              type[20];        /* "coupler", "digital_input", etc. */
-    uint32_t          vendor_id;
-    uint32_t          product_code;
-    uint32_t          revision;
-    ecat_channel_t    channels[ECAT_MAX_CHANNELS];
-    int               channel_count;
+typedef struct
+{
+    int position; /* ec_slave[position] in SOEM (1-based) */
+    char name[ECAT_MAX_NAME_LEN];
+    char type[20]; /* "coupler", "digital_input", etc. */
+    uint32_t vendor_id;
+    uint32_t product_code;
+    uint32_t revision;
+    ecat_channel_t channels[ECAT_MAX_CHANNELS];
+    int channel_count;
     ecat_sdo_config_t sdo_configs[ECAT_MAX_SDOS];
-    int               sdo_count;
-    ecat_pdo_t        rx_pdos[ECAT_MAX_PDOS];
-    int               rx_pdo_count;
-    ecat_pdo_t        tx_pdos[ECAT_MAX_PDOS];
-    int               tx_pdo_count;
+    int sdo_count;
+    ecat_pdo_t rx_pdos[ECAT_MAX_PDOS];
+    int rx_pdo_count;
+    ecat_pdo_t tx_pdos[ECAT_MAX_PDOS];
+    int tx_pdo_count;
     ecat_startup_checks_t startup_checks;
-    ecat_addressing_t     addressing;
-    ecat_timeouts_t       timeouts;
-    ecat_watchdog_t       watchdog;
-    ecat_dc_config_t      dc;
+    ecat_addressing_t addressing;
+    ecat_timeouts_t timeouts;
+    ecat_watchdog_t watchdog;
+    ecat_dc_config_t dc;
     /* Abort master startup on any SDO write failure (default true). */
-    bool                  strict_sdo;
+    bool strict_sdo;
 } ecat_slave_t;
 
 /**
@@ -216,29 +240,31 @@ typedef struct {
  *  \\Device\\NPF_{GUID} can reach ~55 characters. */
 #define ECAT_IFNAME_MAX 128
 
-typedef struct {
-    char             interface[ECAT_IFNAME_MAX];
-    int              cycle_time_us;
-    int              receive_timeout_us;
-    int              watchdog_timeout_cycles;
-    char             log_level[8];
+typedef struct
+{
+    char interface[ECAT_IFNAME_MAX];
+    int cycle_time_us;
+    int receive_timeout_us;
+    int watchdog_timeout_cycles;
+    char log_level[8];
     /** SCHED_FIFO priority for the dedicated bus thread (1-99).
      *  Defaults to 90 — above typical IEC task priorities so the bus
      *  exchange isn't starved by a long PLC scan. */
-    int              task_priority;
+    int task_priority;
     /* Zero outputs and confirm INIT transition on stop_loop (default true). */
-    bool             safe_close;
+    bool safe_close;
 } ecat_master_config_t;
 
 /**
  * @brief Diagnostics configuration
  */
-typedef struct {
-    bool             log_connections;
-    bool             log_data_access;
-    bool             log_errors;
-    int              max_log_entries;
-    int              status_update_interval_ms;
+typedef struct
+{
+    bool log_connections;
+    bool log_data_access;
+    bool log_errors;
+    int max_log_entries;
+    int status_update_interval_ms;
 } ecat_diagnostics_config_t;
 
 /**
@@ -250,10 +276,11 @@ typedef struct {
  * with nested PDOs. It must be allocated statically or on the heap -- never
  * on the stack, as it would overflow most thread stacks.
  */
-typedef struct {
-    ecat_master_config_t      master;
-    ecat_slave_t              slaves[ECAT_MAX_SLAVES];
-    int                       slave_count;
+typedef struct
+{
+    ecat_master_config_t master;
+    ecat_slave_t slaves[ECAT_MAX_SLAVES];
+    int slave_count;
     ecat_diagnostics_config_t diagnostics;
 } ecat_config_t;
 
@@ -297,9 +324,10 @@ void ecat_config_set_logger(plugin_logger_t *logger);
  * scan and test commands accept any name the underlying socket layer
  * accepts, including Windows NPF device paths like "\Device\NPF_{GUID}".
  */
-typedef enum {
-    ECAT_IFACE_LINUX_STRICT,   /* alfanum + '_' '-', starts alpha, len 1..15 */
-    ECAT_IFACE_ANY_PLATFORM    /* Linux + Windows NPF chars '\' '{' '}' '.' */
+typedef enum
+{
+    ECAT_IFACE_LINUX_STRICT, /* alfanum + '_' '-', starts alpha, len 1..15 */
+    ECAT_IFACE_ANY_PLATFORM  /* Linux + Windows NPF chars '\' '{' '}' '.' */
 } ecat_iface_validate_mode_t;
 
 /**
@@ -343,6 +371,18 @@ void ecat_config_init_defaults(ecat_config_t *config);
  */
 ecat_data_type_t ecat_parse_data_type(const char *str);
 
+/**
+ * @brief Resolve a primitive data type from a declared bit length
+ *
+ * Fallback used by the SDO parser when a JSON "data_type" label is not a
+ * recognized scalar type name (see parse_sdo).  Only 8/16/32/64 map to a
+ * type; everything else resolves to ECAT_DTYPE_UNKNOWN.
+ *
+ * @param bits Declared bit length from the JSON
+ * @return Matching ecat_data_type_t, or ECAT_DTYPE_UNKNOWN if not 8/16/32/64
+ */
+ecat_data_type_t ecat_data_type_from_bit_length(int bits);
+
 /*
  * =============================================================================
  * Plugin State Machine
@@ -350,10 +390,10 @@ ecat_data_type_t ecat_parse_data_type(const char *str);
  */
 
 /** Maximum number of recovery attempts before transitioning to ERROR state */
-#define ECAT_MAX_RECOVERY_ATTEMPTS  5
+#define ECAT_MAX_RECOVERY_ATTEMPTS 5
 
 /** Number of consecutive WKC errors before triggering recovery */
-#define ECAT_WKC_ERROR_THRESHOLD    3
+#define ECAT_WKC_ERROR_THRESHOLD 3
 
 /**
  * Enable the background monitor thread for slave state checking and recovery.
@@ -365,11 +405,11 @@ ecat_data_type_t ecat_parse_data_type(const char *str);
  * Define to 0 to disable, 1 to enable.
  */
 #ifndef ECAT_ENABLE_MONITOR_THREAD
-#define ECAT_ENABLE_MONITOR_THREAD  1
+#define ECAT_ENABLE_MONITOR_THREAD 1
 #endif
 
 /** Background monitor thread polling interval in milliseconds */
-#define ECAT_MONITOR_INTERVAL_MS    500
+#define ECAT_MONITOR_INTERVAL_MS 500
 
 /**
  * @brief EtherCAT plugin state machine states
@@ -380,24 +420,26 @@ ecat_data_type_t ecat_parse_data_type(const char *str);
  *   RECOVERING -> ERROR (after max attempts)
  *   Any state -> STOPPED (via stop_loop)
  */
-typedef enum {
-    ECAT_STATE_IDLE,           /* After init(), before start_loop()         */
-    ECAT_STATE_SCANNING,       /* ecx_init + ecx_config_init               */
-    ECAT_STATE_CONFIGURING,    /* SDO writes + PDO mapping                 */
-    ECAT_STATE_TRANSITIONING,  /* Slaves moving to SAFE-OP -> OP           */
-    ECAT_STATE_OPERATIONAL,    /* Normal cyclic operation                   */
-    ECAT_STATE_RECOVERING,     /* Attempting to recover slaves              */
-    ECAT_STATE_ERROR,          /* Unrecoverable error                      */
-    ECAT_STATE_STOPPED         /* After stop_loop() or before init()       */
+typedef enum
+{
+    ECAT_STATE_IDLE,          /* After init(), before start_loop()         */
+    ECAT_STATE_SCANNING,      /* ecx_init + ecx_config_init               */
+    ECAT_STATE_CONFIGURING,   /* SDO writes + PDO mapping                 */
+    ECAT_STATE_TRANSITIONING, /* Slaves moving to SAFE-OP -> OP           */
+    ECAT_STATE_OPERATIONAL,   /* Normal cyclic operation                   */
+    ECAT_STATE_RECOVERING,    /* Attempting to recover slaves              */
+    ECAT_STATE_ERROR,         /* Unrecoverable error                      */
+    ECAT_STATE_STOPPED        /* After stop_loop() or before init()       */
 } ecat_plugin_state_t;
 
 /**
  * @brief Per-slave status snapshot for monitoring
  */
-typedef struct {
-    int      position;
-    char     name[ECAT_MAX_NAME_LEN];
-    uint16_t al_state;          /* EC_STATE_* from SOEM                    */
+typedef struct
+{
+    int position;
+    char name[ECAT_MAX_NAME_LEN];
+    uint16_t al_state; /* EC_STATE_* from SOEM                    */
     uint16_t al_status_code;
     uint32_t error_count;
 } ecat_slave_status_t;
@@ -435,13 +477,14 @@ typedef struct {
  * each `ecat_master_instance_t`. See ethercat_iface_state.h for the
  * apply/revert API.
  */
-typedef struct {
+typedef struct
+{
     char iface[ECAT_IFNAME_MAX];
 
     /* NIC tuning -- ethtool -C (coalescing) */
     bool coalescing_saved;
-    int  rx_usecs;
-    int  tx_usecs;
+    int rx_usecs;
+    int tx_usecs;
 
     /* NIC tuning -- ethtool -K (offloads) */
     bool offloads_saved;
@@ -483,26 +526,27 @@ typedef struct {
  * at master start so the wall-clock smoothing stays consistent across
  * different cycle rates.
  */
-typedef struct {
-    _Atomic(uint64_t) cycle_count;       /* total cycles executed              */
-    _Atomic(uint64_t) wkc_error_count;   /* total WKC errors (wkc < expected)  */
-    _Atomic(uint64_t) noframe_count;     /* total EC_NOFRAME (-1) errors       */
+typedef struct
+{
+    _Atomic(uint64_t) cycle_count;     /* total cycles executed              */
+    _Atomic(uint64_t) wkc_error_count; /* total WKC errors (wkc < expected)  */
+    _Atomic(uint64_t) noframe_count;   /* total EC_NOFRAME (-1) errors       */
 
     /* Work timing -- bus exchange duration */
-    _Atomic(uint64_t) bus_cycle_ns;          /* last send+receive duration (ns) */
-    _Atomic(uint64_t) max_bus_cycle_ns;      /* worst-case send+receive         */
-    _Atomic(uint64_t) min_bus_cycle_ns;      /* best-case send+receive          */
-    _Atomic(int64_t)  avg_bus_cycle_ns_sum;  /* EWMA accumulator; avg = sum/N   */
+    _Atomic(uint64_t) bus_cycle_ns;        /* last send+receive duration (ns) */
+    _Atomic(uint64_t) max_bus_cycle_ns;    /* worst-case send+receive         */
+    _Atomic(uint64_t) min_bus_cycle_ns;    /* best-case send+receive          */
+    _Atomic(int64_t) avg_bus_cycle_ns_sum; /* EWMA accumulator; avg = sum/N   */
 
     /* Scheduling timing -- period and wake-up latency */
-    _Atomic(uint64_t) period_ns;             /* last observed cycle period (ns) */
-    _Atomic(uint64_t) max_period_ns;         /* worst-case period               */
-    _Atomic(uint64_t) min_period_ns;         /* best-case period                */
-    _Atomic(int64_t)  avg_period_ns_sum;     /* EWMA accumulator; avg = sum/N   */
-    _Atomic(int64_t)  latency_ns;            /* last wake-up scheduling delay   */
-    _Atomic(int64_t)  max_latency_ns;        /* worst-case wake-up delay        */
-    _Atomic(int64_t)  min_latency_ns;        /* best-case wake-up delay         */
-    _Atomic(int64_t)  avg_latency_ns_sum;    /* EWMA accumulator; avg = sum/N   */
+    _Atomic(uint64_t) period_ns;         /* last observed cycle period (ns) */
+    _Atomic(uint64_t) max_period_ns;     /* worst-case period               */
+    _Atomic(uint64_t) min_period_ns;     /* best-case period                */
+    _Atomic(int64_t) avg_period_ns_sum;  /* EWMA accumulator; avg = sum/N   */
+    _Atomic(int64_t) latency_ns;         /* last wake-up scheduling delay   */
+    _Atomic(int64_t) max_latency_ns;     /* worst-case wake-up delay        */
+    _Atomic(int64_t) min_latency_ns;     /* best-case wake-up delay         */
+    _Atomic(int64_t) avg_latency_ns_sum; /* EWMA accumulator; avg = sum/N   */
 } ecat_cycle_diag_t;
 
 /*
@@ -521,84 +565,91 @@ typedef struct {
 /**
  * @brief IEC 61131-3 data size qualifiers
  */
-typedef enum {
-    IEC_SIZE_BIT,    /* X -- single bit   */
-    IEC_SIZE_BYTE,   /* B -- 1 byte       */
-    IEC_SIZE_WORD,   /* W -- 2 bytes      */
-    IEC_SIZE_DWORD,  /* D -- 4 bytes      */
-    IEC_SIZE_LWORD   /* L -- 8 bytes      */
+typedef enum
+{
+    IEC_SIZE_BIT,   /* X -- single bit   */
+    IEC_SIZE_BYTE,  /* B -- 1 byte       */
+    IEC_SIZE_WORD,  /* W -- 2 bytes      */
+    IEC_SIZE_DWORD, /* D -- 4 bytes      */
+    IEC_SIZE_LWORD  /* L -- 8 bytes      */
 } iec_size_t;
 
 /**
  * @brief IEC 61131-3 direction qualifiers
  */
-typedef enum {
-    IEC_DIR_INPUT,   /* I -- physical input  */
-    IEC_DIR_OUTPUT   /* Q -- physical output */
+typedef enum
+{
+    IEC_DIR_INPUT, /* I -- physical input  */
+    IEC_DIR_OUTPUT /* Q -- physical output */
 } iec_dir_t;
 
 /**
  * @brief Parsed IEC location -- result of parsing a string like "%IX0.3"
  */
-typedef struct {
-    iec_dir_t  direction;   /* I or Q            */
-    iec_size_t size;        /* X, B, W, D, L     */
-    int        byte_index;  /* byte address       */
-    int        bit_index;   /* bit within byte (X only, 0-7; -1 otherwise) */
+typedef struct
+{
+    iec_dir_t direction; /* I or Q            */
+    iec_size_t size;     /* X, B, W, D, L     */
+    int byte_index;      /* byte address       */
+    int bit_index;       /* bit within byte (X only, 0-7; -1 otherwise) */
 } iec_location_t;
 
 /**
  * @brief Single entry in the channel map
  */
-typedef struct {
+typedef struct
+{
     /* IOmap side */
-    size_t   iomap_offset;     /* byte offset from IOmap base            */
-    int      iomap_bit_offset; /* bit offset within the byte (0-7)       */
-    uint8_t  bit_length;       /* channel width in bits                  */
+    size_t iomap_offset;  /* byte offset from IOmap base            */
+    int iomap_bit_offset; /* bit offset within the byte (0-7)       */
+    uint8_t bit_length;   /* channel width in bits                  */
 
     /* PLC side */
-    iec_size_t      size;      /* IEC size qualifier                     */
-    int             byte_index;/* byte index into PLC buffer             */
-    int             bit_index; /* bit index (IEC_SIZE_BIT only, else -1) */
-    ecat_data_type_t data_type;/* CoE data type from the PDO entry       */
+    iec_size_t size;            /* IEC size qualifier                     */
+    int byte_index;             /* byte index into PLC buffer             */
+    int bit_index;              /* bit index (IEC_SIZE_BIT only, else -1) */
+    ecat_data_type_t data_type; /* CoE data type from the PDO entry       */
 } ecat_channel_map_entry_t;
 
 /**
  * @brief Complete channel map -- separate arrays for inputs and outputs
  */
-typedef struct {
+typedef struct
+{
     ecat_channel_map_entry_t inputs[ECAT_MAX_MAP_ENTRIES];
-    int                      input_count;
+    int input_count;
     ecat_channel_map_entry_t outputs[ECAT_MAX_MAP_ENTRIES];
-    int                      output_count;
+    int output_count;
 } ecat_channel_map_t;
 
 /**
  * @brief Single pre-resolved transfer entry
  */
-typedef struct {
-    void    *plc_ptr;           /* direct pointer to the PLC variable        */
-    size_t   iomap_offset;      /* byte offset from IOmap base               */
-    int      iomap_bit_offset;  /* bit offset within the byte (0-7)          */
-    uint8_t  byte_count;        /* bytes to copy (1, 2, 4, or 8)            */
-    bool     is_bit;            /* true for IEC_SIZE_BIT channels            */
+typedef struct
+{
+    void *plc_ptr;        /* direct pointer to the PLC variable        */
+    size_t iomap_offset;  /* byte offset from IOmap base               */
+    int iomap_bit_offset; /* bit offset within the byte (0-7)          */
+    uint8_t byte_count;   /* bytes to copy (1, 2, 4, or 8)            */
+    bool is_bit;          /* true for IEC_SIZE_BIT channels            */
     /* Journal coordinates for INPUT channels. Input data read from the bus
      * is published into the PLC %I image through the lock-free journal (not
      * poked directly via plc_ptr), so it is race-free against the IEC task
      * threads without holding any image lock. Unused for output channels,
      * which still read the %Q image directly through plc_ptr. */
-    int      journal_index;     /* byte index into the input image           */
-    int      journal_bit;       /* bit index (bit channels only, else 0)     */
+    int journal_index; /* byte index into the input image           */
+    int journal_bit;   /* bit index (bit channels only, else 0)     */
 } ecat_transfer_entry_t;
 
 /**
  * @brief Complete transfer list -- separate arrays for inputs and outputs
  */
-typedef struct {
+typedef struct
+{
     ecat_transfer_entry_t inputs[ECAT_MAX_MAP_ENTRIES];
-    int                   input_count;
+    int input_count;
     ecat_transfer_entry_t outputs[ECAT_MAX_MAP_ENTRIES];
-    int                   output_count;
+    int output_count;
 } ecat_transfer_list_t;
 
 /*
@@ -615,9 +666,10 @@ typedef struct {
  * Must be heap-allocated (too large for stack: ~7MB per instance
  * due to the inline ecat_config_t slave array).
  */
-typedef struct {
+typedef struct
+{
     /* Identity */
-    char name[ECAT_MAX_NAME_LEN];       /* master name from JSON config */
+    char name[ECAT_MAX_NAME_LEN]; /* master name from JSON config */
 
     /* Configuration (parsed from JSON) */
     ecat_config_t config;
@@ -633,7 +685,7 @@ typedef struct {
     ecat_transfer_list_t transfer_list;
 
     /* State machine */
-    _Atomic(int) plugin_state;          /* ecat_plugin_state_t */
+    _Atomic(int) plugin_state; /* ecat_plugin_state_t */
     int expected_wkc;
     int receive_timeout_us;
 
@@ -660,8 +712,8 @@ typedef struct {
      * needs into slaves_snapshot[] under slaves_mutex (PRIO_INHERIT).  JSON
      * handlers take that mutex briefly; the PLC never touches it. */
     ecat_slave_status_t slaves_snapshot[ECAT_MAX_SLAVES];
-    int                 slaves_snapshot_count;
-    pthread_mutex_t     slaves_mutex;
+    int slaves_snapshot_count;
+    pthread_mutex_t slaves_mutex;
 
 #if ECAT_ENABLE_MONITOR_THREAD
     /* Monitor thread — per-instance.
@@ -683,13 +735,13 @@ typedef struct {
      * exchange independently of the IEC scan threads. Bus cycle stats
      * live on `inst->diag` and reach the editor via the existing
      * /api/discovery/ethercat/{runtime-status,diagnostics} routes. */
-    pthread_t              bus_thread;
-    _Atomic(bool)          bus_running;
+    pthread_t bus_thread;
+    _Atomic(bool) bus_running;
 
     /* Time-based EWMA window in samples; computed from cycle_time_us at
      * start_single_master so the wall-clock smoothing window matches
      * ECAT_AVG_TARGET_WINDOW_NS regardless of configured cycle rate. */
-    int64_t                avg_window;
+    int64_t avg_window;
 
     /* Per-iface external state (NIC tuning + IP-stack isolation).
      * Populated by ecat_iface_state_apply(); consumed by
@@ -711,10 +763,8 @@ typedef struct {
  * @param out_count    Output: number of masters actually parsed
  * @return ECAT_CONFIG_OK on success, negative error code on failure
  */
-int ecat_config_parse_all(const char *config_path,
-                          ecat_master_instance_t *instances,
-                          int max_masters,
-                          int *out_count);
+int ecat_config_parse_all(const char *config_path, ecat_master_instance_t *instances,
+                          int max_masters, int *out_count);
 
 /**
  * @brief Convert plugin state enum to human-readable string

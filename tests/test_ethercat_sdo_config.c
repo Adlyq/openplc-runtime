@@ -32,34 +32,34 @@ static int write_sdo_json(const char *value_token, const char *data_type)
         return -1;
 
     fprintf(fp,
-        "[{\n"
-        "  \"name\": \"test\",\n"
-        "  \"protocol\": \"ETHERCAT\",\n"
-        "  \"config\": {\n"
-        "    \"master\": { \"interface\": \"eth0\", \"cycle_time_us\": 1000, "
-        "\"receive_timeout_us\": 2000 },\n"
-        "    \"slaves\": [{\n"
-        "      \"position\": 1,\n"
-        "      \"name\": \"TestSlave\",\n"
-        "      \"type\": \"coupler\",\n"
-        "      \"vendor_id\": \"0x00000002\",\n"
-        "      \"product_code\": \"0x00000001\",\n"
-        "      \"revision\": \"0x00000001\",\n"
-        "      \"channels\": [],\n"
-        "      \"sdo_configurations\": [{\n"
-        "        \"index\": \"0x8000\",\n"
-        "        \"subindex\": 1,\n"
-        "        \"value\": %s,\n"
-        "        \"data_type\": \"%s\",\n"
-        "        \"name\": \"TestSDO\"\n"
-        "      }],\n"
-        "      \"rx_pdos\": [],\n"
-        "      \"tx_pdos\": []\n"
-        "    }],\n"
-        "    \"diagnostics\": {}\n"
-        "  }\n"
-        "}]\n",
-        value_token, data_type);
+            "[{\n"
+            "  \"name\": \"test\",\n"
+            "  \"protocol\": \"ETHERCAT\",\n"
+            "  \"config\": {\n"
+            "    \"master\": { \"interface\": \"eth0\", \"cycle_time_us\": 1000, "
+            "\"receive_timeout_us\": 2000 },\n"
+            "    \"slaves\": [{\n"
+            "      \"position\": 1,\n"
+            "      \"name\": \"TestSlave\",\n"
+            "      \"type\": \"coupler\",\n"
+            "      \"vendor_id\": \"0x00000002\",\n"
+            "      \"product_code\": \"0x00000001\",\n"
+            "      \"revision\": \"0x00000001\",\n"
+            "      \"channels\": [],\n"
+            "      \"sdo_configurations\": [{\n"
+            "        \"index\": \"0x8000\",\n"
+            "        \"subindex\": 1,\n"
+            "        \"value\": %s,\n"
+            "        \"data_type\": \"%s\",\n"
+            "        \"name\": \"TestSDO\"\n"
+            "      }],\n"
+            "      \"rx_pdos\": [],\n"
+            "      \"tx_pdos\": []\n"
+            "    }],\n"
+            "    \"diagnostics\": {}\n"
+            "  }\n"
+            "}]\n",
+            value_token, data_type);
 
     fclose(fp);
     return 0;
@@ -194,33 +194,32 @@ void test_sdo_parse_MissingValue_ShouldDefaultToZero(void)
     FILE *fp = fopen(TEMP_FILE, "w");
     TEST_ASSERT_NOT_NULL(fp);
 
-    fprintf(fp,
-        "[{\n"
-        "  \"name\": \"test\",\n"
-        "  \"protocol\": \"ETHERCAT\",\n"
-        "  \"config\": {\n"
-        "    \"master\": { \"interface\": \"eth0\", \"cycle_time_us\": 1000, "
-        "\"receive_timeout_us\": 2000 },\n"
-        "    \"slaves\": [{\n"
-        "      \"position\": 1,\n"
-        "      \"name\": \"TestSlave\",\n"
-        "      \"type\": \"coupler\",\n"
-        "      \"vendor_id\": \"0x00000002\",\n"
-        "      \"product_code\": \"0x00000001\",\n"
-        "      \"revision\": \"0x00000001\",\n"
-        "      \"channels\": [],\n"
-        "      \"sdo_configurations\": [{\n"
-        "        \"index\": \"0x8000\",\n"
-        "        \"subindex\": 1,\n"
-        "        \"data_type\": \"UINT16\",\n"
-        "        \"name\": \"TestSDO\"\n"
-        "      }],\n"
-        "      \"rx_pdos\": [],\n"
-        "      \"tx_pdos\": []\n"
-        "    }],\n"
-        "    \"diagnostics\": {}\n"
-        "  }\n"
-        "}]\n");
+    fprintf(fp, "[{\n"
+                "  \"name\": \"test\",\n"
+                "  \"protocol\": \"ETHERCAT\",\n"
+                "  \"config\": {\n"
+                "    \"master\": { \"interface\": \"eth0\", \"cycle_time_us\": 1000, "
+                "\"receive_timeout_us\": 2000 },\n"
+                "    \"slaves\": [{\n"
+                "      \"position\": 1,\n"
+                "      \"name\": \"TestSlave\",\n"
+                "      \"type\": \"coupler\",\n"
+                "      \"vendor_id\": \"0x00000002\",\n"
+                "      \"product_code\": \"0x00000001\",\n"
+                "      \"revision\": \"0x00000001\",\n"
+                "      \"channels\": [],\n"
+                "      \"sdo_configurations\": [{\n"
+                "        \"index\": \"0x8000\",\n"
+                "        \"subindex\": 1,\n"
+                "        \"data_type\": \"UINT16\",\n"
+                "        \"name\": \"TestSDO\"\n"
+                "      }],\n"
+                "      \"rx_pdos\": [],\n"
+                "      \"tx_pdos\": []\n"
+                "    }],\n"
+                "    \"diagnostics\": {}\n"
+                "  }\n"
+                "}]\n");
     fclose(fp);
 
     static ecat_config_t config;
@@ -272,6 +271,141 @@ void test_sdo_parse_StringLargeHex_ShouldParseCorrectly(void)
 
     TEST_ASSERT_EQUAL_INT(ECAT_CONFIG_OK, rc);
     TEST_ASSERT_DOUBLE_WITHIN(0.001, 6699.0, config.slaves[0].sdo_configs[0].value);
+
+    cleanup_temp();
+}
+
+/* ---- Unrecognized data_type with a numeric bit_length ---- */
+/* Editor exports of record objects (e.g. "DT2000EN8") carry no scalar type
+ * name.  The parser maps them by bit_length and flags them best-effort so a
+ * device rejection does not abort the bus. */
+
+static int write_sdo_json_bit_length(const char *value_token, const char *data_type, int bit_length)
+{
+    FILE *fp = fopen(TEMP_FILE, "w");
+    if (!fp)
+        return -1;
+
+    fprintf(fp,
+            "[{\n"
+            "  \"name\": \"test\",\n"
+            "  \"protocol\": \"ETHERCAT\",\n"
+            "  \"config\": {\n"
+            "    \"master\": { \"interface\": \"eth0\", \"cycle_time_us\": 1000, "
+            "\"receive_timeout_us\": 2000 },\n"
+            "    \"slaves\": [{\n"
+            "      \"position\": 1,\n"
+            "      \"name\": \"TestSlave\",\n"
+            "      \"type\": \"coupler\",\n"
+            "      \"vendor_id\": \"0x00000002\",\n"
+            "      \"product_code\": \"0x00000001\",\n"
+            "      \"revision\": \"0x00000001\",\n"
+            "      \"channels\": [],\n"
+            "      \"sdo_configurations\": [{\n"
+            "        \"index\": \"0x8000\",\n"
+            "        \"subindex\": 1,\n"
+            "        \"value\": %s,\n"
+            "        \"data_type\": \"%s\",\n"
+            "        \"bit_length\": %d,\n"
+            "        \"name\": \"TestSDO\"\n"
+            "      }],\n"
+            "      \"rx_pdos\": [],\n"
+            "      \"tx_pdos\": []\n"
+            "    }],\n"
+            "    \"diagnostics\": {}\n"
+            "  }\n"
+            "}]\n",
+            value_token, data_type, bit_length);
+
+    fclose(fp);
+    return 0;
+}
+
+void test_sdo_parse_UnknownTypeWithBitLength_ShouldMapToUint8AndBestEffort(void)
+{
+    write_sdo_json_bit_length("0", "DT2000EN8", 8);
+
+    static ecat_config_t config;
+    int rc = ecat_config_parse(TEMP_FILE, &config);
+
+    TEST_ASSERT_EQUAL_INT(ECAT_CONFIG_OK, rc);
+    TEST_ASSERT_EQUAL_INT(1, config.slaves[0].sdo_count);
+    TEST_ASSERT_EQUAL_INT(ECAT_DTYPE_UINT8, config.slaves[0].sdo_configs[0].parsed_type);
+    TEST_ASSERT_TRUE(config.slaves[0].sdo_configs[0].best_effort);
+
+    cleanup_temp();
+}
+
+void test_sdo_parse_UnknownTypeWith16BitLength_ShouldMapToUint16(void)
+{
+    write_sdo_json_bit_length("0", "DT0800EN16", 16);
+
+    static ecat_config_t config;
+    int rc = ecat_config_parse(TEMP_FILE, &config);
+
+    TEST_ASSERT_EQUAL_INT(ECAT_CONFIG_OK, rc);
+    TEST_ASSERT_EQUAL_INT(ECAT_DTYPE_UINT16, config.slaves[0].sdo_configs[0].parsed_type);
+    TEST_ASSERT_TRUE(config.slaves[0].sdo_configs[0].best_effort);
+
+    cleanup_temp();
+}
+
+/* ---- Unrecognized structured data_type without usable width ---- */
+/* Structured/array objects ("ARRAY [0..69] OF BYTE") cannot be encoded as a
+ * scalar startup SDO write; the entry is skipped and parsing continues. */
+
+void test_sdo_parse_StructuredArrayType_ShouldSkipEntryAndParse(void)
+{
+    FILE *fp = fopen(TEMP_FILE, "w");
+    TEST_ASSERT_NOT_NULL(fp);
+
+    fprintf(fp, "[{\n"
+                "  \"name\": \"test\",\n"
+                "  \"protocol\": \"ETHERCAT\",\n"
+                "  \"config\": {\n"
+                "    \"master\": { \"interface\": \"eth0\", \"cycle_time_us\": 1000, "
+                "\"receive_timeout_us\": 2000 },\n"
+                "    \"slaves\": [{\n"
+                "      \"position\": 1,\n"
+                "      \"name\": \"TestSlave\",\n"
+                "      \"type\": \"coupler\",\n"
+                "      \"vendor_id\": \"0x00000002\",\n"
+                "      \"product_code\": \"0x00000001\",\n"
+                "      \"revision\": \"0x00000001\",\n"
+                "      \"channels\": [],\n"
+                "      \"sdo_configurations\": [{\n"
+                "        \"index\": \"0x8000\",\n"
+                "        \"subindex\": 1,\n"
+                "        \"data_type\": \"ARRAY [0..69] OF BYTE\",\n"
+                "        \"name\": \"TestSDO\"\n"
+                "      }],\n"
+                "      \"rx_pdos\": [],\n"
+                "      \"tx_pdos\": []\n"
+                "    }],\n"
+                "    \"diagnostics\": {}\n"
+                "  }\n"
+                "}]\n");
+    fclose(fp);
+
+    static ecat_config_t config;
+    int rc = ecat_config_parse(TEMP_FILE, &config);
+
+    TEST_ASSERT_EQUAL_INT(ECAT_CONFIG_OK, rc);
+    TEST_ASSERT_EQUAL_INT(0, config.slaves[0].sdo_count);
+
+    cleanup_temp();
+}
+
+/* ---- PAD stays invalid for an SDO ---- */
+
+void test_sdo_parse_PadDataType_ShouldReject(void)
+{
+    write_sdo_json("0", "PAD");
+
+    static ecat_config_t config;
+    int rc = ecat_config_parse(TEMP_FILE, &config);
+
+    TEST_ASSERT_NOT_EQUAL_INT(ECAT_CONFIG_OK, rc);
 
     cleanup_temp();
 }

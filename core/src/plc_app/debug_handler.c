@@ -22,16 +22,16 @@
 
 #define MAX_DEBUG_FRAME 4096
 
-#define MB_FC_DEBUG_INFO     0x41
-#define MB_FC_DEBUG_SET      0x42
-#define MB_FC_DEBUG_GET      0x43
+#define MB_FC_DEBUG_INFO 0x41
+#define MB_FC_DEBUG_SET 0x42
+#define MB_FC_DEBUG_GET 0x43
 #define MB_FC_DEBUG_GET_LIST 0x44
-#define MB_FC_DEBUG_GET_MD5  0x45
+#define MB_FC_DEBUG_GET_MD5 0x45
 
-#define MB_DEBUG_SUCCESS              0x7E
-#define MB_DEBUG_ERROR_OUT_OF_BOUNDS  0x81
-#define MB_DEBUG_ERROR_OUT_OF_MEMORY  0x82
-#define MB_DEBUG_ERROR_NOT_LOADED     0x83
+#define MB_DEBUG_SUCCESS 0x7E
+#define MB_DEBUG_ERROR_OUT_OF_BOUNDS 0x81
+#define MB_DEBUG_ERROR_OUT_OF_MEMORY 0x82
+#define MB_DEBUG_ERROR_NOT_LOADED 0x83
 
 /* Each FC 0x44 request entry is 3 bytes (arr + elem_hi + elem_lo). With
  * MAX_DEBUG_FRAME = 4096, 1024 entries fit comfortably plus the response
@@ -45,11 +45,9 @@
 
 static inline bool debug_symbols_ready(void)
 {
-    return ext_strucpp_debug_array_count != NULL &&
-           ext_strucpp_debug_elem_count  != NULL &&
-           ext_strucpp_debug_size        != NULL &&
-           ext_strucpp_debug_set         != NULL &&
-           ext_strucpp_debug_read        != NULL;
+    return ext_strucpp_debug_array_count != NULL && ext_strucpp_debug_elem_count != NULL &&
+           ext_strucpp_debug_size != NULL && ext_strucpp_debug_set != NULL &&
+           ext_strucpp_debug_read != NULL;
 }
 
 /* Defense-in-depth bounds check on the array index that arrived over the
@@ -66,7 +64,7 @@ static inline void write_u32_be(uint8_t *p, uint32_t v)
 {
     p[0] = (uint8_t)((v >> 24) & 0xFF);
     p[1] = (uint8_t)((v >> 16) & 0xFF);
-    p[2] = (uint8_t)((v >>  8) & 0xFF);
+    p[2] = (uint8_t)((v >> 8) & 0xFF);
     p[3] = (uint8_t)(v & 0xFF);
 }
 
@@ -99,7 +97,8 @@ static void debugInfo(uint8_t *frame, size_t *frame_len)
 
     uint8_t arr_count = ext_strucpp_debug_array_count();
     uint8_t max_arrs  = (uint8_t)((MAX_DEBUG_FRAME - 3) / 2);
-    if (arr_count > max_arrs) arr_count = max_arrs;
+    if (arr_count > max_arrs)
+        arr_count = max_arrs;
 
     frame[0] = MB_FC_DEBUG_INFO;
     frame[1] = arr_count;
@@ -129,10 +128,10 @@ static void debugSetTrace(uint8_t *frame, size_t *frame_len, size_t length)
         return;
     }
 
-    uint8_t  arr     = frame[1];
-    uint16_t elem    = read_u16_be(&frame[2]);
-    uint8_t  force   = frame[4];
-    uint16_t val_len = read_u16_be(&frame[5]);
+    uint8_t arr            = frame[1];
+    uint16_t elem          = read_u16_be(&frame[2]);
+    uint8_t force          = frame[4];
+    uint16_t val_len       = read_u16_be(&frame[5]);
     const uint8_t *val_ptr = (val_len > 0) ? &frame[7] : NULL;
 
     if (!debug_arr_in_range(arr))
@@ -155,11 +154,11 @@ static void debugSetTrace(uint8_t *frame, size_t *frame_len, size_t length)
      * workers (OpenPLC bug #3). Enqueue the force/unforce; the dispatcher
      * applies it at the no-task-running window (race-free, ~1 scan later). The
      * editor polls continuously, so the small latency is invisible. */
-    uint8_t op = (force != 0) ? (uint8_t)DBGW_OP_FORCE : (uint8_t)DBGW_OP_UNFORCE;
+    uint8_t op        = (force != 0) ? (uint8_t)DBGW_OP_FORCE : (uint8_t)DBGW_OP_UNFORCE;
     const uint8_t *vp = (force != 0) ? val_ptr : NULL;
-    uint16_t       vl = (force != 0) ? val_len : 0;
-    int rc = runtime_external_write(arr, elem, op, vp, vl);
-    uint8_t status = (rc == 0) ? MB_DEBUG_SUCCESS : MB_DEBUG_ERROR_OUT_OF_MEMORY;
+    uint16_t vl       = (force != 0) ? val_len : 0;
+    int rc            = runtime_external_write(arr, elem, op, vp, vl);
+    uint8_t status    = (rc == 0) ? MB_DEBUG_SUCCESS : MB_DEBUG_ERROR_OUT_OF_MEMORY;
     respond_short(frame, frame_len, MB_FC_DEBUG_SET, status);
 }
 
@@ -177,7 +176,7 @@ static void debugGetTrace(uint8_t *frame, size_t *frame_len, size_t length)
         return;
     }
 
-    uint8_t  arr   = frame[1];
+    uint8_t arr    = frame[1];
     uint16_t start = read_u16_be(&frame[2]);
     uint16_t end   = read_u16_be(&frame[4]);
 
@@ -202,10 +201,10 @@ static void debugGetTrace(uint8_t *frame, size_t *frame_len, size_t length)
      * [8-9] response_size (u16 BE)
      * [10..] data
      */
-    const size_t HDR = 10;
-    uint16_t last_elem   = start;
-    size_t   response_sz = 0;
-    uint8_t *write_ptr   = &frame[HDR];
+    const size_t HDR   = 10;
+    uint16_t last_elem = start;
+    size_t response_sz = 0;
+    uint8_t *write_ptr = &frame[HDR];
 
     for (uint16_t e = start; e <= end; ++e)
     {
@@ -215,7 +214,8 @@ static void debugGetTrace(uint8_t *frame, size_t *frame_len, size_t length)
             last_elem = e;
             continue;
         }
-        if (HDR + response_sz + var_size > MAX_DEBUG_FRAME) break;
+        if (HDR + response_sz + var_size > MAX_DEBUG_FRAME)
+            break;
 
         uint16_t n = ext_strucpp_debug_read(arr, e, write_ptr);
         if (n == 0)
@@ -223,9 +223,9 @@ static void debugGetTrace(uint8_t *frame, size_t *frame_len, size_t length)
             last_elem = e;
             continue;
         }
-        write_ptr   += n;
+        write_ptr += n;
         response_sz += n;
-        last_elem    = e;
+        last_elem = e;
     }
 
     frame[0] = MB_FC_DEBUG_GET;
@@ -274,14 +274,14 @@ static void debugGetTraceList(uint8_t *frame, size_t *frame_len, size_t length)
     uint8_t local_index[VARIDX_SIZE * 3];
     memcpy(local_index, &frame[3], (size_t)num_indexes * 3);
 
-    const size_t HDR = 10;
+    const size_t HDR      = 10;
     uint16_t last_req_idx = 0;
-    size_t   response_sz  = 0;
+    size_t response_sz    = 0;
     uint8_t *write_ptr    = &frame[HDR];
 
     for (uint16_t i = 0; i < num_indexes; ++i)
     {
-        uint8_t  arr  = local_index[i * 3 + 0];
+        uint8_t arr   = local_index[i * 3 + 0];
         uint16_t elem = ((uint16_t)local_index[i * 3 + 1] << 8) | local_index[i * 3 + 2];
 
         if (!debug_arr_in_range(arr))
@@ -296,7 +296,8 @@ static void debugGetTraceList(uint8_t *frame, size_t *frame_len, size_t length)
             last_req_idx = i;
             continue;
         }
-        if (HDR + response_sz + var_size > MAX_DEBUG_FRAME) break;
+        if (HDR + response_sz + var_size > MAX_DEBUG_FRAME)
+            break;
 
         uint16_t n = ext_strucpp_debug_read(arr, elem, write_ptr);
         if (n == 0)
@@ -304,9 +305,9 @@ static void debugGetTraceList(uint8_t *frame, size_t *frame_len, size_t length)
             last_req_idx = i;
             continue;
         }
-        write_ptr    += n;
-        response_sz  += n;
-        last_req_idx  = i;
+        write_ptr += n;
+        response_sz += n;
+        last_req_idx = i;
     }
 
     frame[0] = MB_FC_DEBUG_GET_LIST;
@@ -347,8 +348,7 @@ static void debugGetMd5(uint8_t *frame, size_t *frame_len, size_t length)
 
     size_t pos = 2;
     for (size_t i = 0;
-         i < MD5_HEX_LEN && ext_strucpp_program_md5[i] != '\0' && pos < MAX_DEBUG_FRAME - 2;
-         ++i)
+         i < MD5_HEX_LEN && ext_strucpp_program_md5[i] != '\0' && pos < MAX_DEBUG_FRAME - 2; ++i)
     {
         frame[pos++] = (uint8_t)ext_strucpp_program_md5[i];
     }
@@ -370,16 +370,26 @@ size_t process_debug_data(uint8_t *data, size_t length)
         return 0;
     }
 
-    size_t  response_len = 0;
-    uint8_t fcode        = data[0];
+    size_t response_len = 0;
+    uint8_t fcode       = data[0];
 
     switch (fcode)
     {
-    case MB_FC_DEBUG_INFO:     debugInfo(data, &response_len);                  break;
-    case MB_FC_DEBUG_SET:      debugSetTrace(data, &response_len, length);      break;
-    case MB_FC_DEBUG_GET:      debugGetTrace(data, &response_len, length);      break;
-    case MB_FC_DEBUG_GET_LIST: debugGetTraceList(data, &response_len, length);  break;
-    case MB_FC_DEBUG_GET_MD5:  debugGetMd5(data, &response_len, length);        break;
+    case MB_FC_DEBUG_INFO:
+        debugInfo(data, &response_len);
+        break;
+    case MB_FC_DEBUG_SET:
+        debugSetTrace(data, &response_len, length);
+        break;
+    case MB_FC_DEBUG_GET:
+        debugGetTrace(data, &response_len, length);
+        break;
+    case MB_FC_DEBUG_GET_LIST:
+        debugGetTraceList(data, &response_len, length);
+        break;
+    case MB_FC_DEBUG_GET_MD5:
+        debugGetMd5(data, &response_len, length);
+        break;
     default:
         log_error("[debug] unknown function code 0x%02X", fcode);
         return 0;

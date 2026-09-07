@@ -54,8 +54,7 @@ int ecat_master_open_and_scan(ecat_master_instance_t *inst, plugin_logger_t *log
  *         caller has slave->strict_sdo set, -1 should abort startup.
  */
 int ecat_master_write_sdos(ecat_master_instance_t *inst, int slave_pos,
-                           const ecat_sdo_config_t *sdos,
-                           int sdo_count, int sdo_timeout_ms,
+                           const ecat_sdo_config_t *sdos, int sdo_count, int sdo_timeout_ms,
                            plugin_logger_t *logger);
 
 /**
@@ -70,6 +69,20 @@ int ecat_master_write_sdos(ecat_master_instance_t *inst, int slave_pos,
  * @return 0 on success, -1 on failure
  */
 int ecat_master_configure(ecat_master_instance_t *inst, plugin_logger_t *logger);
+
+/**
+ * @brief Re-apply module/port activation SDOs after the master is OPERATIONAL
+ *
+ * Senmun modular gateways zero their 0x8000 port configuration every time the
+ * mapping is generated (every PRE-OP->SAFE-OP), so config written before OP is
+ * lost.  Calling this once after OPERATIONAL re-writes the port PD lengths,
+ * Master_Control (=3) and Class-A power (0x3000) so the IO-Link master port
+ * actually starts; it must not be followed by a re-mapping or the config is
+ * cleared again.
+ *
+ * @return 0 on success, -1 on fatal error (failures are logged, not fatal)
+ */
+int ecat_master_apply_module_activation(ecat_master_instance_t *inst, plugin_logger_t *logger);
 
 /**
  * @brief Transition all slaves to OPERATIONAL state

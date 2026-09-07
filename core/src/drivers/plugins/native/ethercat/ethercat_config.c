@@ -43,12 +43,14 @@ bool ecat_iface_validate(const char *iface, ecat_iface_validate_mode_t mode)
     if (len == 0)
         return false;
 
-    if (mode == ECAT_IFACE_LINUX_STRICT) {
+    if (mode == ECAT_IFACE_LINUX_STRICT)
+    {
         if (len >= ECAT_LINUX_IFNAME_MAX)
             return false;
         if (!isalpha((unsigned char)iface[0]))
             return false;
-        for (size_t i = 0; i < len; i++) {
+        for (size_t i = 0; i < len; i++)
+        {
             unsigned char c = (unsigned char)iface[i];
             if (!isalnum(c) && c != '_' && c != '-')
                 return false;
@@ -59,10 +61,10 @@ bool ecat_iface_validate(const char *iface, ecat_iface_validate_mode_t mode)
     /* ECAT_IFACE_ANY_PLATFORM: Linux names + Windows NPF device paths */
     if (len >= ECAT_IFNAME_MAX)
         return false;
-    for (size_t i = 0; i < len; i++) {
+    for (size_t i = 0; i < len; i++)
+    {
         unsigned char c = (unsigned char)iface[i];
-        if (!isalnum(c) && c != '_' && c != '-' &&
-            c != '\\' && c != '{' && c != '}' && c != '.')
+        if (!isalnum(c) && c != '_' && c != '-' && c != '\\' && c != '{' && c != '}' && c != '.')
             return false;
     }
     return true;
@@ -85,7 +87,8 @@ bool ecat_is_valid_iface_name(const char *iface)
 static char *read_file(const char *path)
 {
     FILE *fp = fopen(path, "rb");
-    if (fp == NULL) {
+    if (fp == NULL)
+    {
         return NULL;
     }
 
@@ -93,13 +96,15 @@ static char *read_file(const char *path)
     long size = ftell(fp);
     fseek(fp, 0, SEEK_SET);
 
-    if (size <= 0 || size > 1024 * 1024) { /* Max 1MB config file */
+    if (size <= 0 || size > 1024 * 1024)
+    { /* Max 1MB config file */
         fclose(fp);
         return NULL;
     }
 
     char *buffer = (char *)malloc(size + 1);
-    if (buffer == NULL) {
+    if (buffer == NULL)
+    {
         fclose(fp);
         return NULL;
     }
@@ -107,7 +112,8 @@ static char *read_file(const char *path)
     size_t read_size = fread(buffer, 1, size, fp);
     fclose(fp);
 
-    if ((long)read_size != size) {
+    if ((long)read_size != size)
+    {
         free(buffer);
         return NULL;
     }
@@ -121,7 +127,8 @@ static char *read_file(const char *path)
  */
 static void safe_strcpy(char *dest, const char *src, size_t max_len)
 {
-    if (src == NULL) {
+    if (src == NULL)
+    {
         dest[0] = '\0';
         return;
     }
@@ -135,7 +142,8 @@ static void safe_strcpy(char *dest, const char *src, size_t max_len)
 static const char *get_string(const cJSON *obj, const char *key, const char *default_val)
 {
     const cJSON *item = cJSON_GetObjectItemCaseSensitive(obj, key);
-    if (cJSON_IsString(item) && item->valuestring != NULL) {
+    if (cJSON_IsString(item) && item->valuestring != NULL)
+    {
         return item->valuestring;
     }
     return default_val;
@@ -147,7 +155,8 @@ static const char *get_string(const cJSON *obj, const char *key, const char *def
 static int get_int(const cJSON *obj, const char *key, int default_val)
 {
     const cJSON *item = cJSON_GetObjectItemCaseSensitive(obj, key);
-    if (cJSON_IsNumber(item)) {
+    if (cJSON_IsNumber(item))
+    {
         return item->valueint;
     }
     return default_val;
@@ -173,12 +182,14 @@ static double get_numeric_value(const cJSON *obj, const char *key, double defaul
     if (cJSON_IsNumber(item))
         return item->valuedouble;
 
-    if (cJSON_IsString(item) && item->valuestring != NULL && item->valuestring[0] != '\0') {
+    if (cJSON_IsString(item) && item->valuestring != NULL && item->valuestring[0] != '\0')
+    {
         const char *str = item->valuestring;
-        char *endptr = NULL;
+        char *endptr    = NULL;
 
         /* Check for hex prefix */
-        if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X')) {
+        if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
+        {
             long long hex_val = strtoll(str, &endptr, 16);
             if (endptr != str && *endptr == '\0')
                 return (double)hex_val;
@@ -200,7 +211,8 @@ static double get_numeric_value(const cJSON *obj, const char *key, double defaul
 static bool get_bool(const cJSON *obj, const char *key, bool default_val)
 {
     const cJSON *item = cJSON_GetObjectItemCaseSensitive(obj, key);
-    if (cJSON_IsBool(item)) {
+    if (cJSON_IsBool(item))
+    {
         return cJSON_IsTrue(item);
     }
     return default_val;
@@ -211,7 +223,8 @@ static bool get_bool(const cJSON *obj, const char *key, bool default_val)
  */
 static uint32_t hex_to_uint32(const char *hex_str)
 {
-    if (hex_str == NULL) {
+    if (hex_str == NULL)
+    {
         return 0;
     }
     return (uint32_t)strtoul(hex_str, NULL, 16);
@@ -222,7 +235,8 @@ static uint32_t hex_to_uint32(const char *hex_str)
  */
 static int strcasecmp_local(const char *a, const char *b)
 {
-    while (*a && *b) {
+    while (*a && *b)
+    {
         int diff = tolower((unsigned char)*a) - tolower((unsigned char)*b);
         if (diff != 0)
             return diff;
@@ -286,6 +300,34 @@ ecat_data_type_t ecat_parse_data_type(const char *str)
     return ECAT_DTYPE_UNKNOWN;
 }
 
+/**
+ * @brief Resolve a primitive data type from a declared bit length
+ *
+ * Editor exports of record/array CoE objects (e.g. an ABB "OffLine Config"
+ * written as "DT2000EN8") carry a non-standard type label but still declare a
+ * wire width via "bit_length".  This maps that width onto the closest unsigned
+ * integer type so the startup SDO write stays representable.
+ *
+ * @param bits Declared bit length from the JSON
+ * @return Matching ecat_data_type_t, or ECAT_DTYPE_UNKNOWN if not 8/16/32/64
+ */
+ecat_data_type_t ecat_data_type_from_bit_length(int bits)
+{
+    switch (bits)
+    {
+    case 8:
+        return ECAT_DTYPE_UINT8;
+    case 16:
+        return ECAT_DTYPE_UINT16;
+    case 32:
+        return ECAT_DTYPE_UINT32;
+    case 64:
+        return ECAT_DTYPE_UINT64;
+    default:
+        return ECAT_DTYPE_UNKNOWN;
+    }
+}
+
 /*
  * =============================================================================
  * Section Parsers
@@ -300,17 +342,20 @@ static void parse_master_section(const cJSON *master, ecat_master_config_t *conf
     /* Defaults applied even when the "master" object is absent. */
     config->safe_close = true;
 
-    if (master == NULL) {
+    if (master == NULL)
+    {
         return;
     }
 
-    safe_strcpy(config->interface, get_string(master, "interface", "eth0"), sizeof(config->interface));
-    config->cycle_time_us = get_int(master, "cycle_time_us", 1000);
-    config->receive_timeout_us = get_int(master, "receive_timeout_us", 2000);
+    safe_strcpy(config->interface, get_string(master, "interface", "eth0"),
+                sizeof(config->interface));
+    config->cycle_time_us           = get_int(master, "cycle_time_us", 1000);
+    config->receive_timeout_us      = get_int(master, "receive_timeout_us", 2000);
     config->watchdog_timeout_cycles = get_int(master, "watchdog_timeout_cycles", 3);
-    safe_strcpy(config->log_level, get_string(master, "log_level", "info"), sizeof(config->log_level));
+    safe_strcpy(config->log_level, get_string(master, "log_level", "info"),
+                sizeof(config->log_level));
     config->task_priority = get_int(master, "task_priority", 90);
-    config->safe_close = get_bool(master, "safe_close", true);
+    config->safe_close    = get_bool(master, "safe_close", true);
 }
 
 /**
@@ -318,14 +363,15 @@ static void parse_master_section(const cJSON *master, ecat_master_config_t *conf
  */
 static void parse_diagnostics_section(const cJSON *diag, ecat_diagnostics_config_t *config)
 {
-    if (diag == NULL) {
+    if (diag == NULL)
+    {
         return;
     }
 
-    config->log_connections = get_bool(diag, "log_connections", true);
-    config->log_data_access = get_bool(diag, "log_data_access", false);
-    config->log_errors = get_bool(diag, "log_errors", true);
-    config->max_log_entries = get_int(diag, "max_log_entries", 10000);
+    config->log_connections           = get_bool(diag, "log_connections", true);
+    config->log_data_access           = get_bool(diag, "log_data_access", false);
+    config->log_errors                = get_bool(diag, "log_errors", true);
+    config->max_log_entries           = get_int(diag, "max_log_entries", 10000);
     config->status_update_interval_ms = get_int(diag, "status_update_interval_ms", 500);
 }
 
@@ -334,12 +380,13 @@ static void parse_diagnostics_section(const cJSON *diag, ecat_diagnostics_config
  */
 static int parse_pdo_entry(const cJSON *entry_json, ecat_pdo_entry_t *entry)
 {
-    if (entry_json == NULL || entry == NULL) {
+    if (entry_json == NULL || entry == NULL)
+    {
         return ECAT_CONFIG_ERR_INVALID;
     }
 
     safe_strcpy(entry->index, get_string(entry_json, "index", "0x0000"), sizeof(entry->index));
-    entry->subindex = (uint8_t)get_int(entry_json, "subindex", 0);
+    entry->subindex   = (uint8_t)get_int(entry_json, "subindex", 0);
     entry->bit_length = (uint8_t)get_int(entry_json, "bit_length", 0);
     safe_strcpy(entry->name, get_string(entry_json, "name", ""), sizeof(entry->name));
     entry->parsed_type = ecat_parse_data_type(get_string(entry_json, "data_type", ""));
@@ -352,22 +399,27 @@ static int parse_pdo_entry(const cJSON *entry_json, ecat_pdo_entry_t *entry)
  */
 static int parse_pdo(const cJSON *pdo_json, ecat_pdo_t *pdo)
 {
-    if (pdo_json == NULL || pdo == NULL) {
+    if (pdo_json == NULL || pdo == NULL)
+    {
         return ECAT_CONFIG_ERR_INVALID;
     }
 
     safe_strcpy(pdo->index, get_string(pdo_json, "index", "0x0000"), sizeof(pdo->index));
     safe_strcpy(pdo->name, get_string(pdo_json, "name", ""), sizeof(pdo->name));
 
-    pdo->entry_count = 0;
+    pdo->entry_count     = 0;
     const cJSON *entries = cJSON_GetObjectItemCaseSensitive(pdo_json, "entries");
-    if (entries != NULL && cJSON_IsArray(entries)) {
+    if (entries != NULL && cJSON_IsArray(entries))
+    {
         const cJSON *entry_json;
-        cJSON_ArrayForEach(entry_json, entries) {
-            if (pdo->entry_count >= ECAT_MAX_PDO_ENTRIES) {
+        cJSON_ArrayForEach(entry_json, entries)
+        {
+            if (pdo->entry_count >= ECAT_MAX_PDO_ENTRIES)
+            {
                 break;
             }
-            if (parse_pdo_entry(entry_json, &pdo->entries[pdo->entry_count]) == ECAT_CONFIG_OK) {
+            if (parse_pdo_entry(entry_json, &pdo->entries[pdo->entry_count]) == ECAT_CONFIG_OK)
+            {
                 pdo->entry_count++;
             }
         }
@@ -383,16 +435,20 @@ static int parse_pdo_array(const cJSON *pdo_array, ecat_pdo_t *pdos, int *pdo_co
 {
     *pdo_count = 0;
 
-    if (pdo_array == NULL || !cJSON_IsArray(pdo_array)) {
+    if (pdo_array == NULL || !cJSON_IsArray(pdo_array))
+    {
         return ECAT_CONFIG_OK;
     }
 
     const cJSON *pdo_json;
-    cJSON_ArrayForEach(pdo_json, pdo_array) {
-        if (*pdo_count >= ECAT_MAX_PDOS) {
+    cJSON_ArrayForEach(pdo_json, pdo_array)
+    {
+        if (*pdo_count >= ECAT_MAX_PDOS)
+        {
             break;
         }
-        if (parse_pdo(pdo_json, &pdos[*pdo_count]) == ECAT_CONFIG_OK) {
+        if (parse_pdo(pdo_json, &pdos[*pdo_count]) == ECAT_CONFIG_OK)
+        {
             (*pdo_count)++;
         }
     }
@@ -413,20 +469,33 @@ static bool sdo_value_in_range(ecat_data_type_t dt, double v)
 {
     if (isnan(v) || isinf(v))
         return false;
-    switch (dt) {
-    case ECAT_DTYPE_BOOL:   return v == 0.0 || v == 1.0;
-    case ECAT_DTYPE_INT8:   return v >= INT8_MIN  && v <= INT8_MAX;
-    case ECAT_DTYPE_UINT8:  return v >= 0         && v <= UINT8_MAX;
-    case ECAT_DTYPE_INT16:  return v >= INT16_MIN && v <= INT16_MAX;
-    case ECAT_DTYPE_UINT16: return v >= 0         && v <= UINT16_MAX;
-    case ECAT_DTYPE_INT32:  return v >= INT32_MIN && v <= INT32_MAX;
-    case ECAT_DTYPE_UINT32: return v >= 0         && v <= UINT32_MAX;
-    case ECAT_DTYPE_INT64:  return v >= -9.223372036854776e18 && v <= 9.223372036854776e18;
-    case ECAT_DTYPE_UINT64: return v >= 0 && v <= 1.844674407370955e19;
-    case ECAT_DTYPE_REAL32: return v >= -FLT_MAX && v <= FLT_MAX;
-    case ECAT_DTYPE_REAL64: return true;
+    switch (dt)
+    {
+    case ECAT_DTYPE_BOOL:
+        return v == 0.0 || v == 1.0;
+    case ECAT_DTYPE_INT8:
+        return v >= INT8_MIN && v <= INT8_MAX;
+    case ECAT_DTYPE_UINT8:
+        return v >= 0 && v <= UINT8_MAX;
+    case ECAT_DTYPE_INT16:
+        return v >= INT16_MIN && v <= INT16_MAX;
+    case ECAT_DTYPE_UINT16:
+        return v >= 0 && v <= UINT16_MAX;
+    case ECAT_DTYPE_INT32:
+        return v >= INT32_MIN && v <= INT32_MAX;
+    case ECAT_DTYPE_UINT32:
+        return v >= 0 && v <= UINT32_MAX;
+    case ECAT_DTYPE_INT64:
+        return v >= -9.223372036854776e18 && v <= 9.223372036854776e18;
+    case ECAT_DTYPE_UINT64:
+        return v >= 0 && v <= 1.844674407370955e19;
+    case ECAT_DTYPE_REAL32:
+        return v >= -FLT_MAX && v <= FLT_MAX;
+    case ECAT_DTYPE_REAL64:
+        return true;
     case ECAT_DTYPE_UNKNOWN:
-    case ECAT_DTYPE_PAD:    return false;
+    case ECAT_DTYPE_PAD:
+        return false;
     }
     return false;
 }
@@ -447,50 +516,110 @@ static int parse_sdo(const cJSON *sdo_json, ecat_sdo_config_t *sdo)
 
     /* index: required, accepts hex (0x...) or decimal via base 0; range 0x0001..0xFFFF */
     const char *idx_str = get_string(sdo_json, "index", NULL);
-    if (idx_str == NULL || idx_str[0] == '\0') {
+    if (idx_str == NULL || idx_str[0] == '\0')
+    {
         plugin_logger_error(g_config_logger, "SDO entry missing 'index'");
         return ECAT_CONFIG_ERR_MISSING;
     }
-    char *endptr = NULL;
+    char *endptr      = NULL;
     unsigned long idx = strtoul(idx_str, &endptr, 0);
-    if (endptr == idx_str || *endptr != '\0' || idx == 0 || idx > 0xFFFF) {
-        plugin_logger_error(g_config_logger,
-            "SDO 'index' invalid: '%s' (expected hex 0x0001..0xFFFF or decimal 1..65535)",
-            idx_str);
+    if (endptr == idx_str || *endptr != '\0' || idx == 0 || idx > 0xFFFF)
+    {
+        plugin_logger_error(
+            g_config_logger,
+            "SDO 'index' invalid: '%s' (expected hex 0x0001..0xFFFF or decimal 1..65535)", idx_str);
         return ECAT_CONFIG_ERR_INVALID;
     }
     snprintf(sdo->index, sizeof(sdo->index), "0x%04lX", idx);
 
     /* subindex: optional, default 0 (single-entry SDOs).  When present must be 0..255 */
     const cJSON *si = cJSON_GetObjectItemCaseSensitive(sdo_json, "subindex");
-    if (si == NULL) {
+    if (si == NULL)
+    {
         sdo->subindex = 0;
-    } else if (cJSON_IsNumber(si) && si->valueint >= 0 && si->valueint <= 255) {
+    }
+    else if (cJSON_IsNumber(si) && si->valueint >= 0 && si->valueint <= 255)
+    {
         sdo->subindex = (uint8_t)si->valueint;
-    } else {
-        plugin_logger_error(g_config_logger,
-            "SDO %s 'subindex' invalid (must be number 0..255)", sdo->index);
+    }
+    else
+    {
+        plugin_logger_error(g_config_logger, "SDO %s 'subindex' invalid (must be number 0..255)",
+                            sdo->index);
         return ECAT_CONFIG_ERR_INVALID;
     }
 
-    /* data_type: required, must resolve to a known type (UNKNOWN/PAD reject) */
+    /* data_type: required, must resolve to a known type (UNKNOWN/PAD reject).
+     * ESI files declare custom/derived data types (e.g. "DT2000EN8", base
+     * USINT, or "ARRAY [0..69] OF BYTE") next to the standard scalars, and
+     * the Editor exports those names verbatim.  The runtime resolves them:
+     *   - a declared "bit_length" of 8/16/32/64 maps to the matching unsigned
+     *     base type (ESI custom types always derive from one of those widths)
+     *     and the entry is flagged best-effort -- a device rejecting the
+     *     write must not abort the whole bus;
+     *   - wider bit_lengths (byte arrays such as ISDU data buffers) cannot be
+     *     encoded as a scalar startup SDO write and the entry is skipped with
+     *     a warning (such data is device-persistent and not rewritten by
+     *     other masters either);
+     *   - an empty/missing type with no usable width stays a hard error.
+     * PAD is never valid for an SDO write. */
     const char *dtype_str = get_string(sdo_json, "data_type", "");
-    sdo->parsed_type = ecat_parse_data_type(dtype_str);
-    if (sdo->parsed_type == ECAT_DTYPE_UNKNOWN || sdo->parsed_type == ECAT_DTYPE_PAD) {
-        plugin_logger_error(g_config_logger,
-            "SDO %s:%d 'data_type' invalid: '%s' "
-            "(use BOOL/INT8/UINT8/INT16/UINT16/INT32/UINT32/INT64/UINT64/REAL/LREAL)",
-            sdo->index, sdo->subindex, dtype_str);
-        return ECAT_CONFIG_ERR_INVALID;
+    sdo->parsed_type      = ecat_parse_data_type(dtype_str);
+    if (sdo->parsed_type == ECAT_DTYPE_UNKNOWN || sdo->parsed_type == ECAT_DTYPE_PAD)
+    {
+        if (sdo->parsed_type == ECAT_DTYPE_PAD)
+        {
+            plugin_logger_error(g_config_logger,
+                                "SDO %s:%d 'data_type' invalid: 'PAD' (PAD only pads PDO entries, "
+                                "never an SDO write)",
+                                sdo->index, sdo->subindex);
+            return ECAT_CONFIG_ERR_INVALID;
+        }
+
+        int bit_length  = 0;
+        const cJSON *bl = cJSON_GetObjectItemCaseSensitive(sdo_json, "bit_length");
+        if (cJSON_IsNumber(bl))
+        {
+            bit_length = bl->valueint;
+        }
+        sdo->parsed_type = ecat_data_type_from_bit_length(bit_length);
+        if (sdo->parsed_type != ECAT_DTYPE_UNKNOWN)
+        {
+            plugin_logger_info(g_config_logger,
+                               "SDO %s:%d custom/derived data_type '%s' resolved to %s "
+                               "via ESI bit_length %d (best-effort write)",
+                               sdo->index, sdo->subindex, dtype_str,
+                               ecat_data_type_to_string(sdo->parsed_type), bit_length);
+            sdo->best_effort = true;
+        }
+        else if (dtype_str[0] == '\0')
+        {
+            plugin_logger_error(
+                g_config_logger,
+                "SDO %s:%d 'data_type' invalid: '' "
+                "(use BOOL/INT8/UINT8/INT16/UINT16/INT32/UINT32/INT64/UINT64/REAL/LREAL, "
+                "or a numeric 'bit_length' of 8/16/32/64)",
+                sdo->index, sdo->subindex);
+            return ECAT_CONFIG_ERR_INVALID;
+        }
+        else
+        {
+            plugin_logger_warn(g_config_logger,
+                               "SDO %s:%d skipped: 'data_type' '%s' is not a scalar "
+                               "(byte-array/structured objects are device-persistent and "
+                               "cannot be encoded as a startup SDO write)",
+                               sdo->index, sdo->subindex, dtype_str);
+            return ECAT_CONFIG_SKIP_ENTRY;
+        }
     }
 
     /* value: optional with default 0.  When present must fit the wire type. */
     sdo->value = get_numeric_value(sdo_json, "value", 0.0);
-    if (!sdo_value_in_range(sdo->parsed_type, sdo->value)) {
-        plugin_logger_error(g_config_logger,
-            "SDO %s:%d 'value' %g out of range for type %s",
-            sdo->index, sdo->subindex, sdo->value,
-            ecat_data_type_to_string(sdo->parsed_type));
+    if (!sdo_value_in_range(sdo->parsed_type, sdo->value))
+    {
+        plugin_logger_error(g_config_logger, "SDO %s:%d 'value' %g out of range for type %s",
+                            sdo->index, sdo->subindex, sdo->value,
+                            ecat_data_type_to_string(sdo->parsed_type));
         return ECAT_CONFIG_ERR_INVALID;
     }
 
@@ -503,7 +632,8 @@ static int parse_sdo(const cJSON *sdo_json, ecat_sdo_config_t *sdo)
  */
 static int parse_channel(const cJSON *ch_json, ecat_channel_t *channel)
 {
-    if (ch_json == NULL || channel == NULL) {
+    if (ch_json == NULL || channel == NULL)
+    {
         return ECAT_CONFIG_ERR_INVALID;
     }
 
@@ -511,9 +641,12 @@ static int parse_channel(const cJSON *ch_json, ecat_channel_t *channel)
     safe_strcpy(channel->name, get_string(ch_json, "name", ""), sizeof(channel->name));
     safe_strcpy(channel->type, get_string(ch_json, "type", ""), sizeof(channel->type));
     channel->bit_length = (uint8_t)get_int(ch_json, "bit_length", 0);
-    safe_strcpy(channel->iec_location, get_string(ch_json, "iec_location", ""), sizeof(channel->iec_location));
-    safe_strcpy(channel->pdo_index, get_string(ch_json, "pdo_index", ""), sizeof(channel->pdo_index));
-    safe_strcpy(channel->pdo_entry_index, get_string(ch_json, "pdo_entry_index", ""), sizeof(channel->pdo_entry_index));
+    safe_strcpy(channel->iec_location, get_string(ch_json, "iec_location", ""),
+                sizeof(channel->iec_location));
+    safe_strcpy(channel->pdo_index, get_string(ch_json, "pdo_index", ""),
+                sizeof(channel->pdo_index));
+    safe_strcpy(channel->pdo_entry_index, get_string(ch_json, "pdo_entry_index", ""),
+                sizeof(channel->pdo_entry_index));
     channel->pdo_entry_subindex = (uint8_t)get_int(ch_json, "pdo_entry_subindex", 0);
 
     return ECAT_CONFIG_OK;
@@ -524,7 +657,8 @@ static int parse_channel(const cJSON *ch_json, ecat_channel_t *channel)
  */
 static int parse_slave(const cJSON *slave_json, ecat_slave_t *slave)
 {
-    if (slave_json == NULL || slave == NULL) {
+    if (slave_json == NULL || slave == NULL)
+    {
         return ECAT_CONFIG_ERR_INVALID;
     }
 
@@ -535,20 +669,24 @@ static int parse_slave(const cJSON *slave_json, ecat_slave_t *slave)
     safe_strcpy(slave->type, get_string(slave_json, "type", "coupler"), sizeof(slave->type));
 
     /* Convert hex string vendor_id, product_code, revision to uint32_t */
-    slave->vendor_id = hex_to_uint32(get_string(slave_json, "vendor_id", "0x0"));
+    slave->vendor_id    = hex_to_uint32(get_string(slave_json, "vendor_id", "0x0"));
     slave->product_code = hex_to_uint32(get_string(slave_json, "product_code", "0x0"));
-    slave->revision = hex_to_uint32(get_string(slave_json, "revision", "0x0"));
+    slave->revision     = hex_to_uint32(get_string(slave_json, "revision", "0x0"));
 
     /* Parse channels */
-    slave->channel_count = 0;
+    slave->channel_count  = 0;
     const cJSON *channels = cJSON_GetObjectItemCaseSensitive(slave_json, "channels");
-    if (channels != NULL && cJSON_IsArray(channels)) {
+    if (channels != NULL && cJSON_IsArray(channels))
+    {
         const cJSON *ch_json;
-        cJSON_ArrayForEach(ch_json, channels) {
-            if (slave->channel_count >= ECAT_MAX_CHANNELS) {
+        cJSON_ArrayForEach(ch_json, channels)
+        {
+            if (slave->channel_count >= ECAT_MAX_CHANNELS)
+            {
                 break;
             }
-            if (parse_channel(ch_json, &slave->channels[slave->channel_count]) == ECAT_CONFIG_OK) {
+            if (parse_channel(ch_json, &slave->channels[slave->channel_count]) == ECAT_CONFIG_OK)
+            {
                 slave->channel_count++;
             }
         }
@@ -556,21 +694,40 @@ static int parse_slave(const cJSON *slave_json, ecat_slave_t *slave)
 
     /* Parse SDO configurations.  A malformed SDO aborts the slave entirely:
      * a partial SDO write set leaves the slave in an undefined state, so
-     * fail-fast at parse time forces the operator to fix the JSON. */
-    slave->sdo_count = 0;
+     * fail-fast at parse time forces the operator to fix the JSON.  The one
+     * exception is an unrecognized data_type that falls back to a bit_length
+     * width -- those entries are flagged best-effort and skipped on write
+     * failure rather than taking the bus down. */
+    slave->sdo_count  = 0;
     const cJSON *sdos = cJSON_GetObjectItemCaseSensitive(slave_json, "sdo_configurations");
-    if (sdos != NULL && cJSON_IsArray(sdos)) {
+    if (sdos != NULL && cJSON_IsArray(sdos))
+    {
         const cJSON *sdo_json;
-        cJSON_ArrayForEach(sdo_json, sdos) {
-            if (slave->sdo_count >= ECAT_MAX_SDOS) {
-                plugin_logger_error(g_config_logger,
-                    "Slave '%s' position %d: SDO count exceeds ECAT_MAX_SDOS=%d",
-                    slave->name, slave->position, ECAT_MAX_SDOS);
-                return ECAT_CONFIG_ERR_INVALID;
+        cJSON_ArrayForEach(sdo_json, sdos)
+        {
+            /* Editor exports can list hundreds of startup SDOs (per-port
+             * IO-Link/offline objects).  The retained set is bounded by
+             * ECAT_MAX_SDOS; once full, keep the head of the list and warn
+             * instead of failing the whole slave over the tail. */
+            if (slave->sdo_count >= ECAT_MAX_SDOS)
+            {
+                plugin_logger_warn(g_config_logger,
+                                   "Slave '%s' position %d: %d startup SDOs retained, "
+                                   "remaining entries ignored (ECAT_MAX_SDOS=%d)",
+                                   slave->name, slave->position, ECAT_MAX_SDOS, ECAT_MAX_SDOS);
+                break;
             }
             int prc = parse_sdo(sdo_json, &slave->sdo_configs[slave->sdo_count]);
-            if (prc != ECAT_CONFIG_OK) {
-                plugin_logger_error(g_config_logger,
+            if (prc == ECAT_CONFIG_SKIP_ENTRY)
+            {
+                /* Unrepresentable (structured/array) entry -- parse_sdo logged
+                 * why; omit it and keep the rest of the slave. */
+                continue;
+            }
+            if (prc != ECAT_CONFIG_OK)
+            {
+                plugin_logger_error(
+                    g_config_logger,
                     "Slave '%s' position %d: SDO entry rejected (rc=%d) -- aborting slave parse",
                     slave->name, slave->position, prc);
                 return prc;
@@ -580,84 +737,95 @@ static int parse_slave(const cJSON *slave_json, ecat_slave_t *slave)
     }
 
     /* Parse RxPDOs and TxPDOs */
-    parse_pdo_array(cJSON_GetObjectItemCaseSensitive(slave_json, "rx_pdos"),
-                    slave->rx_pdos, &slave->rx_pdo_count);
-    parse_pdo_array(cJSON_GetObjectItemCaseSensitive(slave_json, "tx_pdos"),
-                    slave->tx_pdos, &slave->tx_pdo_count);
+    parse_pdo_array(cJSON_GetObjectItemCaseSensitive(slave_json, "rx_pdos"), slave->rx_pdos,
+                    &slave->rx_pdo_count);
+    parse_pdo_array(cJSON_GetObjectItemCaseSensitive(slave_json, "tx_pdos"), slave->tx_pdos,
+                    &slave->tx_pdo_count);
 
     /* Parse per-slave configuration (defaults applied if "config" is absent) */
-    slave->startup_checks.check_vendor_id = true;
+    slave->startup_checks.check_vendor_id    = true;
     slave->startup_checks.check_product_code = true;
-    slave->addressing.ethercat_address = 0;
-    slave->timeouts.sdo_timeout_ms = 1000;
+    slave->addressing.ethercat_address       = 0;
+    slave->timeouts.sdo_timeout_ms           = 1000;
     slave->timeouts.init_to_preop_timeout_ms = 3000;
-    slave->timeouts.safeop_to_op_timeout_ms = 10000;
-    slave->watchdog.sm_watchdog_enabled = true;
-    slave->watchdog.sm_watchdog_ms = 100;
-    slave->watchdog.pdi_watchdog_enabled = false;
-    slave->watchdog.pdi_watchdog_ms = 100;
-    slave->dc.enabled = false;
-    slave->dc.sync_unit_cycle_us = 0;
-    slave->dc.sync0_enabled = false;
-    slave->dc.sync0_cycle_us = 0;
-    slave->dc.sync0_shift_us = 0;
-    slave->dc.sync1_enabled = false;
-    slave->dc.sync1_cycle_us = 0;
-    slave->dc.sync1_shift_us = 0;
-    slave->strict_sdo = true;
+    slave->timeouts.safeop_to_op_timeout_ms  = 10000;
+    slave->watchdog.sm_watchdog_enabled      = true;
+    slave->watchdog.sm_watchdog_ms           = 100;
+    slave->watchdog.pdi_watchdog_enabled     = false;
+    slave->watchdog.pdi_watchdog_ms          = 100;
+    slave->dc.enabled                        = false;
+    slave->dc.sync_unit_cycle_us             = 0;
+    slave->dc.sync0_enabled                  = false;
+    slave->dc.sync0_cycle_us                 = 0;
+    slave->dc.sync0_shift_us                 = 0;
+    slave->dc.sync1_enabled                  = false;
+    slave->dc.sync1_cycle_us                 = 0;
+    slave->dc.sync1_shift_us                 = 0;
+    slave->strict_sdo                        = true;
 
     const cJSON *cfg = cJSON_GetObjectItemCaseSensitive(slave_json, "config");
-    if (cfg != NULL && cJSON_IsObject(cfg)) {
+    if (cfg != NULL && cJSON_IsObject(cfg))
+    {
         slave->strict_sdo = get_bool(cfg, "strict_sdo", true);
 
         /* Startup checks */
         const cJSON *sc = cJSON_GetObjectItemCaseSensitive(cfg, "startup_checks");
-        if (sc != NULL && cJSON_IsObject(sc)) {
-            slave->startup_checks.check_vendor_id = get_bool(sc, "check_vendor_id", true);
+        if (sc != NULL && cJSON_IsObject(sc))
+        {
+            slave->startup_checks.check_vendor_id    = get_bool(sc, "check_vendor_id", true);
             slave->startup_checks.check_product_code = get_bool(sc, "check_product_code", true);
         }
 
         /* Addressing */
         const cJSON *addr = cJSON_GetObjectItemCaseSensitive(cfg, "addressing");
-        if (addr != NULL && cJSON_IsObject(addr)) {
+        if (addr != NULL && cJSON_IsObject(addr))
+        {
             slave->addressing.ethercat_address = (uint16_t)get_int(addr, "ethercat_address", 0);
         }
 
         /* Timeouts (negative values fall back to defaults) */
         const cJSON *to = cJSON_GetObjectItemCaseSensitive(cfg, "timeouts");
-        if (to != NULL && cJSON_IsObject(to)) {
+        if (to != NULL && cJSON_IsObject(to))
+        {
             int val;
             val = get_int(to, "sdo_timeout_ms", 1000);
-            if (val > 0) slave->timeouts.sdo_timeout_ms = val;
+            if (val > 0)
+                slave->timeouts.sdo_timeout_ms = val;
             val = get_int(to, "init_to_preop_timeout_ms", 3000);
-            if (val > 0) slave->timeouts.init_to_preop_timeout_ms = val;
+            if (val > 0)
+                slave->timeouts.init_to_preop_timeout_ms = val;
             val = get_int(to, "safeop_to_op_timeout_ms", 10000);
-            if (val > 0) slave->timeouts.safeop_to_op_timeout_ms = val;
+            if (val > 0)
+                slave->timeouts.safeop_to_op_timeout_ms = val;
         }
 
         /* Watchdog (negative ms values fall back to defaults) */
         const cJSON *wd = cJSON_GetObjectItemCaseSensitive(cfg, "watchdog");
-        if (wd != NULL && cJSON_IsObject(wd)) {
+        if (wd != NULL && cJSON_IsObject(wd))
+        {
             int val;
             slave->watchdog.sm_watchdog_enabled = get_bool(wd, "sm_watchdog_enabled", true);
-            val = get_int(wd, "sm_watchdog_ms", 100);
-            if (val > 0) slave->watchdog.sm_watchdog_ms = val;
+            val                                 = get_int(wd, "sm_watchdog_ms", 100);
+            if (val > 0)
+                slave->watchdog.sm_watchdog_ms = val;
             slave->watchdog.pdi_watchdog_enabled = get_bool(wd, "pdi_watchdog_enabled", false);
-            val = get_int(wd, "pdi_watchdog_ms", 100);
-            if (val > 0) slave->watchdog.pdi_watchdog_ms = val;
+            val                                  = get_int(wd, "pdi_watchdog_ms", 100);
+            if (val > 0)
+                slave->watchdog.pdi_watchdog_ms = val;
         }
 
         /* Distributed Clocks */
         const cJSON *dc = cJSON_GetObjectItemCaseSensitive(cfg, "distributed_clocks");
-        if (dc != NULL && cJSON_IsObject(dc)) {
-            slave->dc.enabled = get_bool(dc, "enabled", false);
+        if (dc != NULL && cJSON_IsObject(dc))
+        {
+            slave->dc.enabled            = get_bool(dc, "enabled", false);
             slave->dc.sync_unit_cycle_us = get_int(dc, "sync_unit_cycle_us", 0);
-            slave->dc.sync0_enabled = get_bool(dc, "sync0_enabled", false);
-            slave->dc.sync0_cycle_us = get_int(dc, "sync0_cycle_us", 0);
-            slave->dc.sync0_shift_us = get_int(dc, "sync0_shift_us", 0);
-            slave->dc.sync1_enabled = get_bool(dc, "sync1_enabled", false);
-            slave->dc.sync1_cycle_us = get_int(dc, "sync1_cycle_us", 0);
-            slave->dc.sync1_shift_us = get_int(dc, "sync1_shift_us", 0);
+            slave->dc.sync0_enabled      = get_bool(dc, "sync0_enabled", false);
+            slave->dc.sync0_cycle_us     = get_int(dc, "sync0_cycle_us", 0);
+            slave->dc.sync0_shift_us     = get_int(dc, "sync0_shift_us", 0);
+            slave->dc.sync1_enabled      = get_bool(dc, "sync1_enabled", false);
+            slave->dc.sync1_cycle_us     = get_int(dc, "sync1_cycle_us", 0);
+            slave->dc.sync1_shift_us     = get_int(dc, "sync1_shift_us", 0);
         }
     }
 
@@ -671,20 +839,25 @@ static int parse_slaves_section(const cJSON *slaves, ecat_config_t *config)
 {
     config->slave_count = 0;
 
-    if (slaves == NULL || !cJSON_IsArray(slaves)) {
+    if (slaves == NULL || !cJSON_IsArray(slaves))
+    {
         return ECAT_CONFIG_OK;
     }
 
     const cJSON *slave_json;
-    cJSON_ArrayForEach(slave_json, slaves) {
-        if (config->slave_count >= ECAT_MAX_SLAVES) {
+    cJSON_ArrayForEach(slave_json, slaves)
+    {
+        if (config->slave_count >= ECAT_MAX_SLAVES)
+        {
             plugin_logger_error(g_config_logger,
-                "slaves array exceeds ECAT_MAX_SLAVES=%d -- "
-                "extra entries ignored", ECAT_MAX_SLAVES);
+                                "slaves array exceeds ECAT_MAX_SLAVES=%d -- "
+                                "extra entries ignored",
+                                ECAT_MAX_SLAVES);
             break;
         }
         int prc = parse_slave(slave_json, &config->slaves[config->slave_count]);
-        if (prc != ECAT_CONFIG_OK) {
+        if (prc != ECAT_CONFIG_OK)
+        {
             /* parse_slave already logged the specific reason; propagate. */
             return prc;
         }
@@ -702,7 +875,8 @@ static int parse_slaves_section(const cJSON *slaves, ecat_config_t *config)
 
 void ecat_config_init_defaults(ecat_config_t *config)
 {
-    if (config == NULL) {
+    if (config == NULL)
+    {
         return;
     }
 
@@ -710,24 +884,25 @@ void ecat_config_init_defaults(ecat_config_t *config)
 
     /* Master defaults */
     safe_strcpy(config->master.interface, "eth0", sizeof(config->master.interface));
-    config->master.cycle_time_us = 1000;
-    config->master.receive_timeout_us = 2000;
+    config->master.cycle_time_us           = 1000;
+    config->master.receive_timeout_us      = 2000;
     config->master.watchdog_timeout_cycles = 3;
     safe_strcpy(config->master.log_level, "info", sizeof(config->master.log_level));
     config->master.task_priority = 90;
-    config->master.safe_close = true;
+    config->master.safe_close    = true;
 
     /* Diagnostics defaults */
-    config->diagnostics.log_connections = true;
-    config->diagnostics.log_data_access = false;
-    config->diagnostics.log_errors = true;
-    config->diagnostics.max_log_entries = 10000;
+    config->diagnostics.log_connections           = true;
+    config->diagnostics.log_data_access           = false;
+    config->diagnostics.log_errors                = true;
+    config->diagnostics.max_log_entries           = 10000;
     config->diagnostics.status_update_interval_ms = 500;
 }
 
 int ecat_config_parse(const char *config_path, ecat_config_t *config)
 {
-    if (config_path == NULL || config == NULL) {
+    if (config_path == NULL || config == NULL)
+    {
         return ECAT_CONFIG_ERR_INVALID;
     }
 
@@ -736,7 +911,8 @@ int ecat_config_parse(const char *config_path, ecat_config_t *config)
 
     /* Read file contents */
     char *json_str = read_file(config_path);
-    if (json_str == NULL) {
+    if (json_str == NULL)
+    {
         return ECAT_CONFIG_ERR_FILE;
     }
 
@@ -744,7 +920,8 @@ int ecat_config_parse(const char *config_path, ecat_config_t *config)
     cJSON *root = cJSON_Parse(json_str);
     free(json_str);
 
-    if (root == NULL) {
+    if (root == NULL)
+    {
         return ECAT_CONFIG_ERR_PARSE;
     }
 
@@ -754,21 +931,27 @@ int ecat_config_parse(const char *config_path, ecat_config_t *config)
      */
     const cJSON *config_obj = NULL;
 
-    if (cJSON_IsArray(root)) {
+    if (cJSON_IsArray(root))
+    {
         const cJSON *first_entry = cJSON_GetArrayItem(root, 0);
-        if (first_entry != NULL) {
+        if (first_entry != NULL)
+        {
             config_obj = cJSON_GetObjectItemCaseSensitive(first_entry, "config");
         }
-    } else if (cJSON_IsObject(root)) {
+    }
+    else if (cJSON_IsObject(root))
+    {
         /* Also support a bare config object for flexibility */
         config_obj = cJSON_GetObjectItemCaseSensitive(root, "config");
-        if (config_obj == NULL) {
+        if (config_obj == NULL)
+        {
             /* The root itself might be the config */
             config_obj = root;
         }
     }
 
-    if (config_obj == NULL) {
+    if (config_obj == NULL)
+    {
         cJSON_Delete(root);
         return ECAT_CONFIG_ERR_PARSE;
     }
@@ -776,11 +959,13 @@ int ecat_config_parse(const char *config_path, ecat_config_t *config)
     /* Parse each section */
     parse_master_section(cJSON_GetObjectItemCaseSensitive(config_obj, "master"), &config->master);
     int srs = parse_slaves_section(cJSON_GetObjectItemCaseSensitive(config_obj, "slaves"), config);
-    if (srs != ECAT_CONFIG_OK) {
+    if (srs != ECAT_CONFIG_OK)
+    {
         cJSON_Delete(root);
         return srs;
     }
-    parse_diagnostics_section(cJSON_GetObjectItemCaseSensitive(config_obj, "diagnostics"), &config->diagnostics);
+    parse_diagnostics_section(cJSON_GetObjectItemCaseSensitive(config_obj, "diagnostics"),
+                              &config->diagnostics);
 
     cJSON_Delete(root);
 
@@ -788,12 +973,11 @@ int ecat_config_parse(const char *config_path, ecat_config_t *config)
     return ecat_config_validate(config);
 }
 
-int ecat_config_parse_all(const char *config_path,
-                          ecat_master_instance_t *instances,
-                          int max_masters,
-                          int *out_count)
+int ecat_config_parse_all(const char *config_path, ecat_master_instance_t *instances,
+                          int max_masters, int *out_count)
 {
-    if (config_path == NULL || instances == NULL || out_count == NULL || max_masters < 1) {
+    if (config_path == NULL || instances == NULL || out_count == NULL || max_masters < 1)
+    {
         return ECAT_CONFIG_ERR_INVALID;
     }
 
@@ -801,7 +985,8 @@ int ecat_config_parse_all(const char *config_path,
 
     /* Read file contents */
     char *json_str = read_file(config_path);
-    if (json_str == NULL) {
+    if (json_str == NULL)
+    {
         return ECAT_CONFIG_ERR_FILE;
     }
 
@@ -809,15 +994,18 @@ int ecat_config_parse_all(const char *config_path,
     cJSON *root = cJSON_Parse(json_str);
     free(json_str);
 
-    if (root == NULL) {
+    if (root == NULL)
+    {
         return ECAT_CONFIG_ERR_PARSE;
     }
 
-    if (!cJSON_IsArray(root)) {
+    if (!cJSON_IsArray(root))
+    {
         /* Fall back to single-entry parse for bare config objects */
         ecat_config_init_defaults(&instances[0].config);
         const cJSON *config_obj = cJSON_GetObjectItemCaseSensitive(root, "config");
-        if (config_obj == NULL) {
+        if (config_obj == NULL)
+        {
             config_obj = root;
         }
         const char *name = get_string(root, "name", "master");
@@ -826,7 +1014,8 @@ int ecat_config_parse_all(const char *config_path,
                              &instances[0].config.master);
         int srs = parse_slaves_section(cJSON_GetObjectItemCaseSensitive(config_obj, "slaves"),
                                        &instances[0].config);
-        if (srs != ECAT_CONFIG_OK) {
+        if (srs != ECAT_CONFIG_OK)
+        {
             cJSON_Delete(root);
             return srs;
         }
@@ -834,7 +1023,8 @@ int ecat_config_parse_all(const char *config_path,
                                   &instances[0].config.diagnostics);
         cJSON_Delete(root);
         int result = ecat_config_validate(&instances[0].config);
-        if (result == ECAT_CONFIG_OK) {
+        if (result == ECAT_CONFIG_OK)
+        {
             *out_count = 1;
         }
         return result;
@@ -842,30 +1032,35 @@ int ecat_config_parse_all(const char *config_path,
 
     /* Iterate all entries in the array.  Loop runs to the end (not stops
      * at max_masters) so we can warn about entries that exceed the cap. */
-    int count = 0;
+    int count      = 0;
     int array_size = cJSON_GetArraySize(root);
 
-    for (int i = 0; i < array_size; i++) {
+    for (int i = 0; i < array_size; i++)
+    {
         const cJSON *entry = cJSON_GetArrayItem(root, i);
-        if (entry == NULL) continue;
+        if (entry == NULL)
+            continue;
 
         /* Check protocol is ETHERCAT (case-insensitive) */
         const char *protocol = get_string(entry, "protocol", "");
-        if (strcasecmp_local(protocol, "ETHERCAT") != 0) continue;
+        if (strcasecmp_local(protocol, "ETHERCAT") != 0)
+            continue;
 
         const cJSON *config_obj = cJSON_GetObjectItemCaseSensitive(entry, "config");
-        if (config_obj == NULL) continue;
+        if (config_obj == NULL)
+            continue;
 
         const char *name = get_string(entry, "name", "master");
 
         /* Refuse to parse beyond max_masters but make the rejection
          * visible -- the editor lets the operator add an arbitrary
          * number of entries; silent truncation here surprises users. */
-        if (count >= max_masters) {
+        if (count >= max_masters)
+        {
             plugin_logger_error(g_config_logger,
-                "skipping entry[%d] '%s' -- max_masters=%d reached. "
-                "Increase ECAT_MAX_MASTERS or remove extra ETHERCAT entries.",
-                i, name, max_masters);
+                                "skipping entry[%d] '%s' -- max_masters=%d reached. "
+                                "Increase ECAT_MAX_MASTERS or remove extra ETHERCAT entries.",
+                                i, name, max_masters);
             continue;
         }
 
@@ -877,15 +1072,17 @@ int ecat_config_parse_all(const char *config_path,
 
         /* Parse configuration sections.  A SDO/slave-level error aborts
          * the whole config -- a partially loaded master would surprise
-         * the operator at bus-up time. */
+         * the operator at bus-up time.  (Unknown data_type SDOs that were
+         * mapped by bit_length are best-effort and parse fine.) */
         parse_master_section(cJSON_GetObjectItemCaseSensitive(config_obj, "master"),
                              &instances[count].config.master);
         int srs = parse_slaves_section(cJSON_GetObjectItemCaseSensitive(config_obj, "slaves"),
                                        &instances[count].config);
-        if (srs != ECAT_CONFIG_OK) {
+        if (srs != ECAT_CONFIG_OK)
+        {
             plugin_logger_error(g_config_logger,
-                "entry[%d] '%s': slaves section failed (rc=%d) -- aborting parse",
-                i, name, srs);
+                                "entry[%d] '%s': slaves section failed (rc=%d) -- aborting parse",
+                                i, name, srs);
             cJSON_Delete(root);
             *out_count = 0;
             return srs;
@@ -895,12 +1092,15 @@ int ecat_config_parse_all(const char *config_path,
 
         /* Validate this master's config */
         int result = ecat_config_validate(&instances[count].config);
-        if (result == ECAT_CONFIG_OK) {
+        if (result == ECAT_CONFIG_OK)
+        {
             count++;
-        } else {
+        }
+        else
+        {
             plugin_logger_error(g_config_logger,
-                "skipping entry[%d] '%s' (validation failed, error=%d)",
-                i, name, result);
+                                "skipping entry[%d] '%s' (validation failed, error=%d)", i, name,
+                                result);
         }
     }
 
@@ -910,15 +1110,18 @@ int ecat_config_parse_all(const char *config_path,
      * Per-iface NIC tuning state in ethercat_iface_state.c is
      * single-owner; two masters on the same iface produce corrupted
      * persistence on crash recovery. */
-    for (int i = 0; i < count; i++) {
-        for (int j = i + 1; j < count; j++) {
+    for (int i = 0; i < count; i++)
+    {
+        for (int j = i + 1; j < count; j++)
+        {
             if (strcmp(instances[i].config.master.interface,
-                       instances[j].config.master.interface) == 0) {
+                       instances[j].config.master.interface) == 0)
+            {
                 plugin_logger_error(g_config_logger,
-                    "masters '%s' and '%s' share interface '%s' -- "
-                    "not supported. Use a distinct interface per master.",
-                    instances[i].name, instances[j].name,
-                    instances[i].config.master.interface);
+                                    "masters '%s' and '%s' share interface '%s' -- "
+                                    "not supported. Use a distinct interface per master.",
+                                    instances[i].name, instances[j].name,
+                                    instances[i].config.master.interface);
                 *out_count = 0;
                 return ECAT_CONFIG_ERR_INVALID;
             }
@@ -932,52 +1135,64 @@ int ecat_config_parse_all(const char *config_path,
 
 int ecat_config_validate(const ecat_config_t *config)
 {
-    if (config == NULL) {
+    if (config == NULL)
+    {
         return ECAT_CONFIG_ERR_INVALID;
     }
 
     /* Validate master interface is not empty */
-    if (config->master.interface[0] == '\0') {
+    if (config->master.interface[0] == '\0')
+    {
         return ECAT_CONFIG_ERR_INVALID;
     }
 
     /* Validate cycle time */
-    if (config->master.cycle_time_us < 1) {
+    if (config->master.cycle_time_us < 1)
+    {
         return ECAT_CONFIG_ERR_INVALID;
     }
 
     /* Validate receive timeout */
-    if (config->master.receive_timeout_us < 1) {
+    if (config->master.receive_timeout_us < 1)
+    {
         return ECAT_CONFIG_ERR_INVALID;
     }
 
     /* Validate slave positions are positive and unique */
-    for (int i = 0; i < config->slave_count; i++) {
+    for (int i = 0; i < config->slave_count; i++)
+    {
         const ecat_slave_t *slave = &config->slaves[i];
 
-        if (slave->position < 1) {
+        if (slave->position < 1)
+        {
             return ECAT_CONFIG_ERR_INVALID;
         }
 
-        if (slave->vendor_id == 0) {
+        if (slave->vendor_id == 0)
+        {
             return ECAT_CONFIG_ERR_INVALID;
         }
 
-        if (slave->product_code == 0) {
+        if (slave->product_code == 0)
+        {
             return ECAT_CONFIG_ERR_INVALID;
         }
 
         /* Check for duplicate positions */
-        for (int j = i + 1; j < config->slave_count; j++) {
-            if (slave->position == config->slaves[j].position) {
+        for (int j = i + 1; j < config->slave_count; j++)
+        {
+            if (slave->position == config->slaves[j].position)
+            {
                 return ECAT_CONFIG_ERR_INVALID;
             }
         }
 
         /* Validate channels have IEC location */
-        for (int c = 0; c < slave->channel_count; c++) {
+        for (int c = 0; c < slave->channel_count; c++)
+        {
             const ecat_channel_t *ch = &slave->channels[c];
-            if (ch->iec_location[0] != '\0' && ch->iec_location[0] != '%') {
+            if (ch->iec_location[0] != '\0' && ch->iec_location[0] != '%')
+            {
                 return ECAT_CONFIG_ERR_INVALID;
             }
         }
@@ -994,55 +1209,92 @@ int ecat_config_validate(const ecat_config_t *config)
 
 const char *ecat_state_to_string(ecat_plugin_state_t state)
 {
-    switch (state) {
-    case ECAT_STATE_IDLE:          return "IDLE";
-    case ECAT_STATE_SCANNING:      return "SCANNING";
-    case ECAT_STATE_CONFIGURING:   return "CONFIGURING";
-    case ECAT_STATE_TRANSITIONING: return "TRANSITIONING";
-    case ECAT_STATE_OPERATIONAL:   return "OPERATIONAL";
-    case ECAT_STATE_RECOVERING:    return "RECOVERING";
-    case ECAT_STATE_ERROR:         return "ERROR";
-    case ECAT_STATE_STOPPED:       return "STOPPED";
+    switch (state)
+    {
+    case ECAT_STATE_IDLE:
+        return "IDLE";
+    case ECAT_STATE_SCANNING:
+        return "SCANNING";
+    case ECAT_STATE_CONFIGURING:
+        return "CONFIGURING";
+    case ECAT_STATE_TRANSITIONING:
+        return "TRANSITIONING";
+    case ECAT_STATE_OPERATIONAL:
+        return "OPERATIONAL";
+    case ECAT_STATE_RECOVERING:
+        return "RECOVERING";
+    case ECAT_STATE_ERROR:
+        return "ERROR";
+    case ECAT_STATE_STOPPED:
+        return "STOPPED";
     }
     return "UNKNOWN";
 }
 
 int ecat_data_type_size(ecat_data_type_t dt)
 {
-    switch (dt) {
-    case ECAT_DTYPE_BOOL:    return 1;
-    case ECAT_DTYPE_INT8:    return 1;
-    case ECAT_DTYPE_UINT8:   return 1;
-    case ECAT_DTYPE_INT16:   return 2;
-    case ECAT_DTYPE_UINT16:  return 2;
-    case ECAT_DTYPE_INT32:   return 4;
-    case ECAT_DTYPE_UINT32:  return 4;
-    case ECAT_DTYPE_INT64:   return 8;
-    case ECAT_DTYPE_UINT64:  return 8;
-    case ECAT_DTYPE_REAL32:  return 4;
-    case ECAT_DTYPE_REAL64:  return 8;
-    case ECAT_DTYPE_UNKNOWN: return 0;
-    case ECAT_DTYPE_PAD:     return 0;
+    switch (dt)
+    {
+    case ECAT_DTYPE_BOOL:
+        return 1;
+    case ECAT_DTYPE_INT8:
+        return 1;
+    case ECAT_DTYPE_UINT8:
+        return 1;
+    case ECAT_DTYPE_INT16:
+        return 2;
+    case ECAT_DTYPE_UINT16:
+        return 2;
+    case ECAT_DTYPE_INT32:
+        return 4;
+    case ECAT_DTYPE_UINT32:
+        return 4;
+    case ECAT_DTYPE_INT64:
+        return 8;
+    case ECAT_DTYPE_UINT64:
+        return 8;
+    case ECAT_DTYPE_REAL32:
+        return 4;
+    case ECAT_DTYPE_REAL64:
+        return 8;
+    case ECAT_DTYPE_UNKNOWN:
+        return 0;
+    case ECAT_DTYPE_PAD:
+        return 0;
     }
     return 0;
 }
 
 const char *ecat_data_type_to_string(ecat_data_type_t dt)
 {
-    switch (dt) {
-    case ECAT_DTYPE_UNKNOWN: return "UNKNOWN";
-    case ECAT_DTYPE_BOOL:    return "BOOL";
-    case ECAT_DTYPE_INT8:    return "INT8";
-    case ECAT_DTYPE_UINT8:   return "UINT8";
-    case ECAT_DTYPE_INT16:   return "INT16";
-    case ECAT_DTYPE_UINT16:  return "UINT16";
-    case ECAT_DTYPE_INT32:   return "INT32";
-    case ECAT_DTYPE_UINT32:  return "UINT32";
-    case ECAT_DTYPE_INT64:   return "INT64";
-    case ECAT_DTYPE_UINT64:  return "UINT64";
-    case ECAT_DTYPE_REAL32:  return "REAL32";
-    case ECAT_DTYPE_REAL64:  return "REAL64";
-    case ECAT_DTYPE_PAD:     return "PAD";
+    switch (dt)
+    {
+    case ECAT_DTYPE_UNKNOWN:
+        return "UNKNOWN";
+    case ECAT_DTYPE_BOOL:
+        return "BOOL";
+    case ECAT_DTYPE_INT8:
+        return "INT8";
+    case ECAT_DTYPE_UINT8:
+        return "UINT8";
+    case ECAT_DTYPE_INT16:
+        return "INT16";
+    case ECAT_DTYPE_UINT16:
+        return "UINT16";
+    case ECAT_DTYPE_INT32:
+        return "INT32";
+    case ECAT_DTYPE_UINT32:
+        return "UINT32";
+    case ECAT_DTYPE_INT64:
+        return "INT64";
+    case ECAT_DTYPE_UINT64:
+        return "UINT64";
+    case ECAT_DTYPE_REAL32:
+        return "REAL32";
+    case ECAT_DTYPE_REAL64:
+        return "REAL64";
+    case ECAT_DTYPE_PAD:
+        return "PAD";
     }
     return "UNKNOWN";
 }

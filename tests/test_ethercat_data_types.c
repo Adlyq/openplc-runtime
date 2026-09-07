@@ -241,3 +241,40 @@ void test_parse_data_type_WhitespaceString_ShouldReturnUnknown(void)
 {
     TEST_ASSERT_EQUAL_INT(ECAT_DTYPE_UNKNOWN, ecat_parse_data_type(" BOOL"));
 }
+
+/* ---- bit_length fallback (ecat_data_type_from_bit_length) ---- */
+
+void test_data_type_from_bit_length_8_ShouldReturnUint8(void)
+{
+    TEST_ASSERT_EQUAL_INT(ECAT_DTYPE_UINT8, ecat_data_type_from_bit_length(8));
+}
+
+void test_data_type_from_bit_length_16_ShouldReturnUint16(void)
+{
+    TEST_ASSERT_EQUAL_INT(ECAT_DTYPE_UINT16, ecat_data_type_from_bit_length(16));
+}
+
+void test_data_type_from_bit_length_32_ShouldReturnUint32(void)
+{
+    TEST_ASSERT_EQUAL_INT(ECAT_DTYPE_UINT32, ecat_data_type_from_bit_length(32));
+}
+
+void test_data_type_from_bit_length_64_ShouldReturnUint64(void)
+{
+    TEST_ASSERT_EQUAL_INT(ECAT_DTYPE_UINT64, ecat_data_type_from_bit_length(64));
+}
+
+void test_data_type_from_bit_length_24_ShouldReturnUnknown(void)
+{
+    TEST_ASSERT_EQUAL_INT(ECAT_DTYPE_UNKNOWN, ecat_data_type_from_bit_length(24));
+}
+
+void test_data_type_from_bit_length_0_ShouldReturnUnknown(void)
+{
+    TEST_ASSERT_EQUAL_INT(ECAT_DTYPE_UNKNOWN, ecat_data_type_from_bit_length(0));
+}
+
+void test_data_type_from_bit_length_negative_ShouldReturnUnknown(void)
+{
+    TEST_ASSERT_EQUAL_INT(ECAT_DTYPE_UNKNOWN, ecat_data_type_from_bit_length(-8));
+}

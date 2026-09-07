@@ -13,11 +13,11 @@
 #ifndef ETHERCAT_IO_H
 #define ETHERCAT_IO_H
 
-#include <stdint.h>
 #include "ethercat_config.h"
-#include "plugin_types.h"
 #include "plugin_logger.h"
+#include "plugin_types.h"
 #include "soem/soem.h"
+#include <stdint.h>
 
 /*
  * I/O type definitions (iec_size_t, iec_dir_t, iec_location_t,
@@ -53,13 +53,12 @@ int ecat_io_parse_iec_location(const char *loc_str, iec_location_t *loc);
  * @param inst    Master instance (provides SOEM context and IOmap)
  * @param args    Runtime args (for buffer_size bounds check)
  * @param logger  Logger instance
- * @return 0 on success, -1 if any channel failed to map (partial maps
- *         are rejected to surface JSON/ESI mismatches at startup)
+ * @return 0 on success (channels that could not be mapped are warned and
+ *         skipped -- their PLC variables stay stale), -1 only when nothing
+ *         could be mapped, i.e. the JSON PDO layout mismatches the device
  */
-int ecat_io_build_channel_map(const ecat_config_t *config,
-                              ecat_channel_map_t *map,
-                              ecat_master_instance_t *inst,
-                              plugin_runtime_args_t *args,
+int ecat_io_build_channel_map(const ecat_config_t *config, ecat_channel_map_t *map,
+                              ecat_master_instance_t *inst, plugin_runtime_args_t *args,
                               plugin_logger_t *logger);
 
 /**
@@ -80,10 +79,8 @@ int ecat_io_build_channel_map(const ecat_config_t *config,
  *         populated yet).  Channels without a PLC variable bound are
  *         skipped with a warn but do not fail the call.
  */
-int ecat_io_build_transfer_list(const ecat_channel_map_t *map,
-                                ecat_transfer_list_t *xfer,
-                                plugin_runtime_args_t *args,
-                                plugin_logger_t *logger);
+int ecat_io_build_transfer_list(const ecat_channel_map_t *map, ecat_transfer_list_t *xfer,
+                                plugin_runtime_args_t *args, plugin_logger_t *logger);
 
 /**
  * @brief Fast per-cycle: publish IOmap inputs into the PLC %I image
@@ -97,8 +94,7 @@ int ecat_io_build_transfer_list(const ecat_channel_map_t *map,
  * @param iomap_base Base pointer of the IOmap buffer
  * @param args       Runtime args providing the journal_write_* entry points
  */
-void ecat_io_read_inputs_fast(const ecat_transfer_list_t *xfer,
-                              const uint8_t *iomap_base,
+void ecat_io_read_inputs_fast(const ecat_transfer_list_t *xfer, const uint8_t *iomap_base,
                               plugin_runtime_args_t *args);
 
 /**
@@ -107,7 +103,6 @@ void ecat_io_read_inputs_fast(const ecat_transfer_list_t *xfer,
  * @param xfer       Transfer list built by ecat_io_build_transfer_list()
  * @param iomap_base Base pointer of the IOmap buffer
  */
-void ecat_io_write_outputs_fast(const ecat_transfer_list_t *xfer,
-                                uint8_t *iomap_base);
+void ecat_io_write_outputs_fast(const ecat_transfer_list_t *xfer, uint8_t *iomap_base);
 
 #endif /* ETHERCAT_IO_H */
