@@ -39,25 +39,25 @@
 
 #include <ctype.h>
 #include <errno.h>
-#include <pthread.h>
 #include <signal.h>
 #include <stdatomic.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
+#include <pthread.h>
 #include <time.h>
 #include <unistd.h>
 
-#include "cJSON.h" /* JSON parsing for execute_command */
-#include "ethercat_config.h"
-#include "ethercat_io.h"
-#include "ethercat_master.h"
-#include "ethercat_plugin.h"
 #include "plugin_logger.h"
 #include "plugin_types.h"
-#include "soem/soem.h" /* osal_get_monotonic_time, ec_timet */
+#include "ethercat_plugin.h"
+#include "ethercat_config.h"
+#include "ethercat_master.h"
+#include "ethercat_io.h"
+#include "soem/soem.h"   /* osal_get_monotonic_time, ec_timet */
+#include "cJSON.h"  /* JSON parsing for execute_command */
 
 /* Forward declaration: ecat_bus_thread is defined alongside the bus
  * loop further down in the file but referenced first by
@@ -113,29 +113,14 @@ static const char *al_state_to_string(uint16_t state)
     int has_error = (state & EC_STATE_ERROR) != 0;
 
     const char *name;
-    switch (base)
-    {
-    case EC_STATE_NONE:
-        name = "NONE";
-        break;
-    case EC_STATE_INIT:
-        name = "INIT";
-        break;
-    case EC_STATE_PRE_OP:
-        name = "PRE-OP";
-        break;
-    case EC_STATE_BOOT:
-        name = "BOOT";
-        break;
-    case EC_STATE_SAFE_OP:
-        name = "SAFE-OP";
-        break;
-    case EC_STATE_OPERATIONAL:
-        name = "OP";
-        break;
-    default:
-        name = "UNKNOWN";
-        break;
+    switch (base) {
+    case EC_STATE_NONE:     name = "NONE";     break;
+    case EC_STATE_INIT:     name = "INIT";     break;
+    case EC_STATE_PRE_OP:   name = "PRE-OP";   break;
+    case EC_STATE_BOOT:     name = "BOOT";     break;
+    case EC_STATE_SAFE_OP:  name = "SAFE-OP";  break;
+    case EC_STATE_OPERATIONAL: name = "OP";     break;
+    default:                name = "UNKNOWN";  break;
     }
 
     /* Return static strings for common cases */
@@ -144,16 +129,11 @@ static const char *al_state_to_string(uint16_t state)
 
     /* For error states, we just note it. Since we return static strings,
      * use a small set of pre-defined error state strings. */
-    switch (base)
-    {
-    case EC_STATE_INIT:
-        return "INIT+ERR";
-    case EC_STATE_PRE_OP:
-        return "PRE-OP+ERR";
-    case EC_STATE_SAFE_OP:
-        return "SAFE-OP+ERR";
-    default:
-        return "UNKNOWN+ERR";
+    switch (base) {
+    case EC_STATE_INIT:    return "INIT+ERR";
+    case EC_STATE_PRE_OP:  return "PRE-OP+ERR";
+    case EC_STATE_SAFE_OP: return "SAFE-OP+ERR";
+    default:               return "UNKNOWN+ERR";
     }
 }
 
@@ -165,11 +145,7 @@ static const char *al_state_to_string(uint16_t state)
 
 static void safe_strcpy_local(char *dest, const char *src, size_t max_len)
 {
-    if (src == NULL)
-    {
-        dest[0] = '\0';
-        return;
-    }
+    if (src == NULL) { dest[0] = '\0'; return; }
     strncpy(dest, src, max_len - 1);
     dest[max_len - 1] = '\0';
 }
@@ -188,8 +164,8 @@ static void diag_reset(ecat_cycle_diag_t *d)
 {
     memset(d, 0, sizeof(*d));
     atomic_store_explicit(&d->min_bus_cycle_ns, UINT64_MAX, memory_order_relaxed);
-    atomic_store_explicit(&d->min_period_ns, UINT64_MAX, memory_order_relaxed);
-    atomic_store_explicit(&d->min_latency_ns, INT64_MAX, memory_order_relaxed);
+    atomic_store_explicit(&d->min_period_ns,    UINT64_MAX, memory_order_relaxed);
+    atomic_store_explicit(&d->min_latency_ns,   INT64_MAX,  memory_order_relaxed);
 }
 
 /*
@@ -216,6 +192,7 @@ static int ecat_mutex_init_pi(pthread_mutex_t *m)
     return rc;
 }
 
+
 /*
  * =============================================================================
  * Plugin-Wide State
@@ -227,8 +204,8 @@ static int ecat_mutex_init_pi(pthread_mutex_t *m)
 
 static plugin_logger_t g_logger;
 static plugin_runtime_args_t g_runtime_args;
-static ecat_master_instance_t *g_masters = NULL; /* heap-allocated array */
-static int g_master_count                = 0;
+static ecat_master_instance_t *g_masters = NULL;  /* heap-allocated array */
+static int g_master_count = 0;
 
 /*
  * =============================================================================
@@ -256,8 +233,7 @@ static void publish_slaves_snapshot(ecat_master_instance_t *inst)
     if (n > ECAT_MAX_SLAVES)
         n = ECAT_MAX_SLAVES;
 
-    for (int i = 0; i < n; i++)
-    {
+    for (int i = 0; i < n; i++) {
         const ecat_slave_t *cfg = &inst->config.slaves[i];
         ecat_slave_status_t *ss = &local[i];
 
@@ -266,9 +242,8 @@ static void publish_slaves_snapshot(ecat_master_instance_t *inst)
         ss->name[ECAT_MAX_NAME_LEN - 1] = '\0';
 
         const ec_slavet *soem = ecat_master_get_slave(inst, cfg->position);
-        if (soem)
-        {
-            ss->al_state       = soem->state;
+        if (soem) {
+            ss->al_state = soem->state;
             ss->al_status_code = soem->ALstatuscode;
         }
     }
@@ -299,30 +274,18 @@ static void publish_slaves_snapshot(ecat_master_instance_t *inst)
 /** Map ec_err_type to a short human-readable tag for log lines. */
 static const char *ecat_err_type_name(ec_err_type t)
 {
-    switch (t)
-    {
-    case EC_ERR_TYPE_SDO_ERROR:
-        return "SDO";
-    case EC_ERR_TYPE_EMERGENCY:
-        return "EMERGENCY";
-    case EC_ERR_TYPE_PACKET_ERROR:
-        return "PACKET";
-    case EC_ERR_TYPE_SDOINFO_ERROR:
-        return "SDOINFO";
-    case EC_ERR_TYPE_FOE_ERROR:
-        return "FOE";
-    case EC_ERR_TYPE_FOE_BUF2SMALL:
-        return "FOE_BUF2SMALL";
-    case EC_ERR_TYPE_FOE_PACKETNUMBER:
-        return "FOE_PKTNUM";
-    case EC_ERR_TYPE_SOE_ERROR:
-        return "SOE";
-    case EC_ERR_TYPE_MBX_ERROR:
-        return "MBX";
-    case EC_ERR_TYPE_FOE_FILE_NOTFOUND:
-        return "FOE_NOTFOUND";
-    case EC_ERR_TYPE_EOE_INVALID_RX_DATA:
-        return "EOE_RX";
+    switch (t) {
+    case EC_ERR_TYPE_SDO_ERROR:           return "SDO";
+    case EC_ERR_TYPE_EMERGENCY:           return "EMERGENCY";
+    case EC_ERR_TYPE_PACKET_ERROR:        return "PACKET";
+    case EC_ERR_TYPE_SDOINFO_ERROR:       return "SDOINFO";
+    case EC_ERR_TYPE_FOE_ERROR:           return "FOE";
+    case EC_ERR_TYPE_FOE_BUF2SMALL:       return "FOE_BUF2SMALL";
+    case EC_ERR_TYPE_FOE_PACKETNUMBER:    return "FOE_PKTNUM";
+    case EC_ERR_TYPE_SOE_ERROR:           return "SOE";
+    case EC_ERR_TYPE_MBX_ERROR:           return "MBX";
+    case EC_ERR_TYPE_FOE_FILE_NOTFOUND:   return "FOE_NOTFOUND";
+    case EC_ERR_TYPE_EOE_INVALID_RX_DATA: return "EOE_RX";
     }
     return "UNKNOWN";
 }
@@ -338,35 +301,31 @@ static void log_ecat_error(const ecat_master_instance_t *inst, const ec_errort *
 {
     const char *type = ecat_err_type_name(e->Etype);
 
-    if (e->Etype == EC_ERR_TYPE_EMERGENCY)
-    {
+    if (e->Etype == EC_ERR_TYPE_EMERGENCY) {
         /* CiA 301 "Error reset / no error" carries ErrorCode 0x0000.
          * Surface as info so operators can see drives clearing faults
          * without escalating to error level. */
-        if (e->ErrorCode == 0x0000)
-        {
+        if (e->ErrorCode == 0x0000) {
             plugin_logger_info(&g_logger,
-                               "Master '%s': %s slave=%u code=0x%04X reg=0x%02X "
-                               "data=%02X %04X %04X (error reset)",
-                               inst->name, type, (unsigned)e->Slave, (unsigned)e->ErrorCode,
-                               (unsigned)e->ErrorReg, (unsigned)e->b1, (unsigned)e->w1,
-                               (unsigned)e->w2);
-        }
-        else
-        {
+                "Master '%s': %s slave=%u code=0x%04X reg=0x%02X "
+                "data=%02X %04X %04X (error reset)",
+                inst->name, type, (unsigned)e->Slave,
+                (unsigned)e->ErrorCode, (unsigned)e->ErrorReg,
+                (unsigned)e->b1, (unsigned)e->w1, (unsigned)e->w2);
+        } else {
             plugin_logger_error(&g_logger,
-                                "Master '%s': %s slave=%u code=0x%04X reg=0x%02X "
-                                "data=%02X %04X %04X",
-                                inst->name, type, (unsigned)e->Slave, (unsigned)e->ErrorCode,
-                                (unsigned)e->ErrorReg, (unsigned)e->b1, (unsigned)e->w1,
-                                (unsigned)e->w2);
+                "Master '%s': %s slave=%u code=0x%04X reg=0x%02X "
+                "data=%02X %04X %04X",
+                inst->name, type, (unsigned)e->Slave,
+                (unsigned)e->ErrorCode, (unsigned)e->ErrorReg,
+                (unsigned)e->b1, (unsigned)e->w1, (unsigned)e->w2);
         }
-    }
-    else
-    {
-        plugin_logger_warn(&g_logger, "Master '%s': %s slave=%u index=0x%04X:%u abort=0x%08X",
-                           inst->name, type, (unsigned)e->Slave, (unsigned)e->Index,
-                           (unsigned)e->SubIdx, (unsigned)e->AbortCode);
+    } else {
+        plugin_logger_warn(&g_logger,
+            "Master '%s': %s slave=%u index=0x%04X:%u abort=0x%08X",
+            inst->name, type, (unsigned)e->Slave,
+            (unsigned)e->Index, (unsigned)e->SubIdx,
+            (unsigned)e->AbortCode);
     }
 }
 
@@ -397,8 +356,8 @@ static void drain_mailbox_and_errors(ecat_master_instance_t *inst)
      * operations across the group; the cap keeps the lock window bounded
      * even when traffic is bursty. */
     ecx_mbxhandler(&inst->ecx_context, 0, 8);
-    while (err_count < EC_MAXELIST && ecx_poperror(&inst->ecx_context, &errors[err_count]))
-    {
+    while (err_count < EC_MAXELIST &&
+           ecx_poperror(&inst->ecx_context, &errors[err_count])) {
         err_count++;
     }
     pthread_mutex_unlock(&inst->soem_lock);
@@ -441,10 +400,9 @@ static int attempt_recovery(ecat_master_instance_t *inst)
      * window to grab the lock between our per-slave acquisitions.  In
      * configurations with cycle_time > 1 ms, the trylock would still
      * fail occasionally but exchange_skips no longer climb continuously. */
-    const struct timespec yield = {0, 1000 * 1000}; /* 1 ms */
+    const struct timespec yield = { 0, 1000 * 1000 };  /* 1 ms */
 
-    for (int i = 0; i < inst->config.slave_count; i++)
-    {
+    for (int i = 0; i < inst->config.slave_count; i++) {
         int pos = inst->config.slaves[i].position;
 
         pthread_mutex_lock(&inst->soem_lock);
@@ -452,27 +410,25 @@ static int attempt_recovery(ecat_master_instance_t *inst)
         /* 0 = no recovery needed (slave already in OP); only set to a
          * negative value if ecat_master_recover_slave reports an error. */
         int result = 0;
-        if (state != EC_STATE_OPERATIONAL)
-        {
+        if (state != EC_STATE_OPERATIONAL) {
             all_ok = 0;
             result = ecat_master_recover_slave(inst, pos, &g_logger);
         }
         pthread_mutex_unlock(&inst->soem_lock);
 
-        if (result < 0)
-        {
-            plugin_logger_error(&g_logger, "Master '%s': Slave %d (%s): recovery error", inst->name,
-                                pos, inst->config.slaves[i].name);
+        if (result < 0) {
+            plugin_logger_error(&g_logger,
+                "Master '%s': Slave %d (%s): recovery error",
+                inst->name, pos, inst->config.slaves[i].name);
         }
 
         nanosleep(&yield, NULL);
     }
 
-    if (all_ok)
-    {
+    if (all_ok) {
         plugin_logger_info(&g_logger,
-                           "Master '%s': All slaves recovered to OPERATIONAL (attempts=%d)",
-                           inst->name, atomic_load(&inst->recovery_attempts));
+            "Master '%s': All slaves recovered to OPERATIONAL (attempts=%d)",
+            inst->name, atomic_load(&inst->recovery_attempts));
         atomic_store(&inst->recovery_attempts, 0);
         atomic_store(&inst->recovery_writestate_failures, 0);
         atomic_store(&inst->consecutive_wkc_errors, 0);
@@ -481,20 +437,21 @@ static int attempt_recovery(ecat_master_instance_t *inst)
 
     /* Single-writer (monitor thread) — fetch_add not needed; load+store is
      * sufficient and communicates the ownership model. */
-    int attempts = atomic_load_explicit(&inst->recovery_attempts, memory_order_relaxed) + 1;
-    atomic_store_explicit(&inst->recovery_attempts, attempts, memory_order_relaxed);
+    int attempts = atomic_load_explicit(&inst->recovery_attempts,
+                                        memory_order_relaxed) + 1;
+    atomic_store_explicit(&inst->recovery_attempts, attempts,
+                          memory_order_relaxed);
 
-    if (attempts >= ECAT_MAX_RECOVERY_ATTEMPTS)
-    {
-        plugin_logger_error(
-            &g_logger,
+    if (attempts >= ECAT_MAX_RECOVERY_ATTEMPTS) {
+        plugin_logger_error(&g_logger,
             "Master '%s': Maximum recovery attempts (%d) reached - transitioning to ERROR",
             inst->name, ECAT_MAX_RECOVERY_ATTEMPTS);
         return -1;
     }
 
-    plugin_logger_warn(&g_logger, "Master '%s': Recovery attempt %d/%d - some slaves not yet in OP",
-                       inst->name, attempts, ECAT_MAX_RECOVERY_ATTEMPTS);
+    plugin_logger_warn(&g_logger,
+        "Master '%s': Recovery attempt %d/%d - some slaves not yet in OP",
+        inst->name, attempts, ECAT_MAX_RECOVERY_ATTEMPTS);
     return 0;
 }
 
@@ -528,27 +485,25 @@ static void *ecat_monitor_thread(void *arg)
      * emitted on transitions (state change, WKC errors start/clear) --
      * continuous metrics are already exposed via the status / diagnostics
      * commands consumed by the editor. */
-    int last_logged_state      = -1;
+    int last_logged_state = -1;
     int last_logged_consec_wkc = 0;
 
-    plugin_logger_info(&g_logger, "Master '%s': monitor thread started (interval=%d ms)",
-                       inst->name, ECAT_MONITOR_INTERVAL_MS);
+    plugin_logger_info(&g_logger,
+        "Master '%s': monitor thread started (interval=%d ms)",
+        inst->name, ECAT_MONITOR_INTERVAL_MS);
 
-    while (atomic_load(&inst->monitor_running))
-    {
+    while (atomic_load(&inst->monitor_running)) {
         int state = atomic_load(&inst->plugin_state);
 
-        if (state == ECAT_STATE_OPERATIONAL)
-        {
+        if (state == ECAT_STATE_OPERATIONAL) {
             /* Periodic state check.  Publish slaves snapshot while still
              * holding the lock, so the read of slavelist[] is consistent. */
             pthread_mutex_lock(&inst->soem_lock);
             ecat_master_read_states(inst);
             publish_slaves_snapshot(inst);
             pthread_mutex_unlock(&inst->soem_lock);
-        }
-        else if (state == ECAT_STATE_RECOVERING)
-        {
+
+        } else if (state == ECAT_STATE_RECOVERING) {
             /* attempt_recovery acquires soem_lock per slave with a yield
              * in between, so the PLC trylock has frequent windows to
              * succeed during recovery.  Snapshot publish takes the lock
@@ -559,19 +514,16 @@ static void *ecat_monitor_thread(void *arg)
             publish_slaves_snapshot(inst);
             pthread_mutex_unlock(&inst->soem_lock);
 
-            if (result == 1)
-            {
+            if (result == 1) {
                 atomic_store(&inst->plugin_state, ECAT_STATE_OPERATIONAL);
                 plugin_logger_info(&g_logger,
-                                   "Master '%s': [state: OPERATIONAL] Recovered from error",
-                                   inst->name);
-            }
-            else if (result == -1)
-            {
+                    "Master '%s': [state: OPERATIONAL] Recovered from error",
+                    inst->name);
+            } else if (result == -1) {
                 atomic_store(&inst->plugin_state, ECAT_STATE_ERROR);
                 plugin_logger_error(&g_logger,
-                                    "Master '%s': entered ERROR state after max recovery attempts",
-                                    inst->name);
+                    "Master '%s': entered ERROR state after max recovery attempts",
+                    inst->name);
             }
         }
 
@@ -580,43 +532,39 @@ static void *ecat_monitor_thread(void *arg)
          * Skip in ERROR/STOPPED -- mailbox state is undefined when slaves
          * are not at least in PRE-OP. */
         int mbx_state = atomic_load(&inst->plugin_state);
-        if (mbx_state == ECAT_STATE_OPERATIONAL || mbx_state == ECAT_STATE_RECOVERING)
-        {
+        if (mbx_state == ECAT_STATE_OPERATIONAL ||
+            mbx_state == ECAT_STATE_RECOVERING) {
             drain_mailbox_and_errors(inst);
         }
 
         /* --- Transition-based logging (replaces hot-path PLC logs) --- */
 
         int curr_state = atomic_load(&inst->plugin_state);
-        if (curr_state != last_logged_state)
-        {
-            if (curr_state == ECAT_STATE_RECOVERING)
-            {
+        if (curr_state != last_logged_state) {
+            if (curr_state == ECAT_STATE_RECOVERING) {
                 plugin_logger_warn(&g_logger,
-                                   "Master '%s': WKC error threshold (%d) reached, "
-                                   "[state: RECOVERING]",
-                                   inst->name, ECAT_WKC_ERROR_THRESHOLD);
+                    "Master '%s': WKC error threshold (%d) reached, "
+                    "[state: RECOVERING]",
+                    inst->name, ECAT_WKC_ERROR_THRESHOLD);
             }
             last_logged_state = curr_state;
         }
 
         int consec = atomic_load(&inst->consecutive_wkc_errors);
-        if (consec > 0 && last_logged_consec_wkc == 0)
-        {
+        if (consec > 0 && last_logged_consec_wkc == 0) {
             plugin_logger_warn(&g_logger,
-                               "Master '%s': WKC errors detected (consecutive=%d, expected=%d)",
-                               inst->name, consec, inst->expected_wkc);
+                "Master '%s': WKC errors detected (consecutive=%d, expected=%d)",
+                inst->name, consec, inst->expected_wkc);
             last_logged_consec_wkc = consec;
-        }
-        else if (consec == 0 && last_logged_consec_wkc != 0)
-        {
-            plugin_logger_info(&g_logger, "Master '%s': WKC errors cleared", inst->name);
+        } else if (consec == 0 && last_logged_consec_wkc != 0) {
+            plugin_logger_info(&g_logger,
+                "Master '%s': WKC errors cleared", inst->name);
             last_logged_consec_wkc = 0;
         }
 
         /* Sleep for the monitor interval */
         struct timespec sleep_ts;
-        sleep_ts.tv_sec  = ECAT_MONITOR_INTERVAL_MS / 1000;
+        sleep_ts.tv_sec = ECAT_MONITOR_INTERVAL_MS / 1000;
         sleep_ts.tv_nsec = (ECAT_MONITOR_INTERVAL_MS % 1000) * 1000000L;
         nanosleep(&sleep_ts, NULL);
     }
@@ -641,12 +589,9 @@ static void *ecat_monitor_thread(void *arg)
  * @param inst Per-master instance
  * @return 0 on success, -1 on failure
  */
-/* The channel map offsets are derived from the CONFIG pdo lists, which for a
- * module-only config ignore the FIXED PDO prefix the runtime injects into the
- * assignment (Senmun: fixed 0x1680/0x1A80+0x1A81 must lead the SM).  Re-base
- * module channel offsets so they point at the real SM bytes (the module word
- * sits at the tail of the output/input area) -- otherwise a forced %QW write
- * lands on the fixed PDO region and the IO-Link device never sees it. */
+/* Re-base module channel offsets after the fixed PDO prefix was injected
+ * into the assignment (module PD word sits at the tail of the output/input
+ * area), so a forced %Q write lands on the real SM bytes. */
 static void rebase_module_channel_offsets(ecat_master_instance_t *inst)
 {
     const ecat_config_t *config = &inst->config;
@@ -657,7 +602,7 @@ static void rebase_module_channel_offsets(ecat_master_instance_t *inst)
         return;
 
     size_t mout = 0;
-    size_t min  = 0;
+    size_t min = 0;
     for (int p = 0; p < slave->rx_pdo_count; p++)
         for (int e = 0; e < slave->rx_pdos[p].entry_count; e++)
             mout += slave->rx_pdos[p].entries[e].bit_length;
@@ -665,21 +610,21 @@ static void rebase_module_channel_offsets(ecat_master_instance_t *inst)
         for (int e = 0; e < slave->tx_pdos[p].entry_count; e++)
             min += slave->tx_pdos[p].entries[e].bit_length;
     mout = (mout + 7) / 8;
-    min  = (min + 7) / 8;
+    min = (min + 7) / 8;
 
     const ec_groupt *grp = &inst->ecx_context.grouplist[0];
-    size_t ob           = (size_t)grp->Obytes;
-    size_t ib           = (size_t)grp->Ibytes;
-    size_t bout         = (ob > mout && mout > 0) ? ob - mout : 0;
-    size_t bin          = (ib > min && min > 0) ? ib - min : 0;
+    size_t ob = (size_t)grp->Obytes;
+    size_t ib = (size_t)grp->Ibytes;
+    size_t bout = (ob > mout && mout > 0) ? ob - mout : 0;
+    size_t bin = (ib > min && min > 0) ? ib - min : 0;
 
     if (bout == 0 && bin == 0)
         return;
 
     plugin_logger_info(&g_logger,
-                       "Master '%s': re-basing module channel offsets (+%zuB out / +%zuB in) "
-                       "to account for the fixed PDO prefix",
-                       inst->name, bout, bin);
+        "Master '%s': re-basing module channel offsets (+%zuB out / +%zuB in) "
+        "to account for the fixed PDO prefix",
+        inst->name, bout, bin);
     for (int k = 0; k < inst->channel_map.output_count; k++)
         inst->channel_map.outputs[k].iomap_offset += bout;
     for (int k = 0; k < inst->channel_map.input_count; k++)
@@ -688,20 +633,20 @@ static void rebase_module_channel_offsets(ecat_master_instance_t *inst)
 
 static int start_single_master(ecat_master_instance_t *inst)
 {
-    if (inst->config.slave_count == 0)
-    {
-        plugin_logger_warn(&g_logger, "Master '%s': No slaves configured - skipping", inst->name);
+
+    if (inst->config.slave_count == 0) {
+        plugin_logger_warn(&g_logger,
+            "Master '%s': No slaves configured - skipping", inst->name);
         return -1;
     }
 
     /* --- Phase 1: SCANNING --- */
     atomic_store(&inst->plugin_state, ECAT_STATE_SCANNING);
     plugin_logger_info(&g_logger,
-                       "Master '%s': [state: SCANNING] Opening interface and scanning bus...",
-                       inst->name);
+        "Master '%s': [state: SCANNING] Opening interface and scanning bus...",
+        inst->name);
 
-    if (ecat_master_open_and_scan(inst, &g_logger) != 0)
-    {
+    if (ecat_master_open_and_scan(inst, &g_logger) != 0) {
         plugin_logger_error(&g_logger, "Master '%s': Bus scan failed", inst->name);
         /* open_and_scan may have partially applied iface state -- close reverts it. */
         ecat_master_close(inst, &g_logger);
@@ -712,26 +657,24 @@ static int start_single_master(ecat_master_instance_t *inst)
     /* --- Phase 2: CONFIGURING (SDO writes + PDO mapping) --- */
     atomic_store(&inst->plugin_state, ECAT_STATE_CONFIGURING);
     plugin_logger_info(&g_logger,
-                       "Master '%s': [state: CONFIGURING] Writing SDOs and mapping process data...",
-                       inst->name);
+        "Master '%s': [state: CONFIGURING] Writing SDOs and mapping process data...",
+        inst->name);
 
     /* Write SDOs for each slave that has them configured.  When
      * slave->strict_sdo is true (default) any failed write aborts the
      * master so it never enters OPERATIONAL with a half-configured slave. */
-    for (int i = 0; i < inst->config.slave_count; i++)
-    {
+    for (int i = 0; i < inst->config.slave_count; i++) {
         const ecat_slave_t *slave = &inst->config.slaves[i];
         if (slave->sdo_count == 0)
             continue;
 
-        int rc = ecat_master_write_sdos(inst, slave->position, slave->sdo_configs, slave->sdo_count,
+        int rc = ecat_master_write_sdos(inst, slave->position, slave->sdo_configs,
+                                        slave->sdo_count,
                                         slave->timeouts.sdo_timeout_ms, &g_logger);
-        if (rc != 0 && slave->strict_sdo)
-        {
+        if (rc != 0 && slave->strict_sdo) {
             plugin_logger_error(&g_logger,
-                                "Master '%s': Slave %d (%s): SDO config failed and strict_sdo=true "
-                                "-- aborting startup",
-                                inst->name, slave->position, slave->name);
+                "Master '%s': Slave %d (%s): SDO config failed and strict_sdo=true -- aborting startup",
+                inst->name, slave->position, slave->name);
             ecat_master_close(inst, &g_logger);
             atomic_store(&inst->plugin_state, ECAT_STATE_ERROR);
             return -1;
@@ -739,23 +682,22 @@ static int start_single_master(ecat_master_instance_t *inst)
     }
 
     /* Map process data and configure DC */
-    if (ecat_master_configure(inst, &g_logger) != 0)
-    {
-        plugin_logger_error(&g_logger, "Master '%s': Process data mapping failed", inst->name);
+    if (ecat_master_configure(inst, &g_logger) != 0) {
+        plugin_logger_error(&g_logger,
+            "Master '%s': Process data mapping failed", inst->name);
         ecat_master_close(inst, &g_logger);
         atomic_store(&inst->plugin_state, ECAT_STATE_ERROR);
         return -1;
     }
 
-    /* Build channel map for process data exchange.  Channels that reference
-     * PDO entries the device does not expose are skipped with a warning (the
-     * master can still reach OPERATIONAL); failure here means nothing at all
-     * could be mapped, i.e. the JSON's PDO layout mismatches the device. */
-    if (ecat_io_build_channel_map(&inst->config, &inst->channel_map, inst, &g_runtime_args,
-                                  &g_logger) != 0)
-    {
-        plugin_logger_error(&g_logger, "Master '%s': channel map build failed -- aborting startup",
-                            inst->name);
+    /* Build channel map for process data exchange.  Partial maps are
+     * rejected -- the operator must fix the JSON before the master can
+     * enter OPERATIONAL with stale variable bindings. */
+    if (ecat_io_build_channel_map(&inst->config, &inst->channel_map,
+                                  inst, &g_runtime_args, &g_logger) != 0) {
+        plugin_logger_error(&g_logger,
+            "Master '%s': channel map build failed -- aborting startup",
+            inst->name);
         ecat_master_close(inst, &g_logger);
         atomic_store(&inst->plugin_state, ECAT_STATE_ERROR);
         return -1;
@@ -765,11 +707,11 @@ static int start_single_master(ecat_master_instance_t *inst)
     rebase_module_channel_offsets(inst);
 
     /* Build pre-resolved transfer list for fast per-cycle I/O */
-    if (ecat_io_build_transfer_list(&inst->channel_map, &inst->transfer_list, &g_runtime_args,
-                                    &g_logger) != 0)
-    {
-        plugin_logger_error(
-            &g_logger, "Master '%s': transfer list build failed -- aborting startup", inst->name);
+    if (ecat_io_build_transfer_list(&inst->channel_map, &inst->transfer_list,
+                                    &g_runtime_args, &g_logger) != 0) {
+        plugin_logger_error(&g_logger,
+            "Master '%s': transfer list build failed -- aborting startup",
+            inst->name);
         ecat_master_close(inst, &g_logger);
         atomic_store(&inst->plugin_state, ECAT_STATE_ERROR);
         return -1;
@@ -777,24 +719,25 @@ static int start_single_master(ecat_master_instance_t *inst)
 
     /* Cache expected WKC */
     inst->expected_wkc = ecat_master_get_expected_wkc(inst);
-    plugin_logger_info(&g_logger, "Master '%s': Expected WKC: %d", inst->name, inst->expected_wkc);
+    plugin_logger_info(&g_logger, "Master '%s': Expected WKC: %d",
+                       inst->name, inst->expected_wkc);
 
     inst->receive_timeout_us = inst->config.master.receive_timeout_us;
     if (inst->receive_timeout_us < ECAT_MIN_RECEIVE_TIMEOUT_US)
         inst->receive_timeout_us = ECAT_MIN_RECEIVE_TIMEOUT_US;
-    plugin_logger_info(&g_logger, "Master '%s': Receive timeout: %d us (cycle_time=%d us)",
-                       inst->name, inst->receive_timeout_us, inst->config.master.cycle_time_us);
+    plugin_logger_info(&g_logger,
+        "Master '%s': Receive timeout: %d us (cycle_time=%d us)",
+        inst->name, inst->receive_timeout_us, inst->config.master.cycle_time_us);
 
     /* --- Phase 3: TRANSITIONING --- */
     atomic_store(&inst->plugin_state, ECAT_STATE_TRANSITIONING);
     plugin_logger_info(&g_logger,
-                       "Master '%s': [state: TRANSITIONING] Moving slaves to OPERATIONAL...",
-                       inst->name);
+        "Master '%s': [state: TRANSITIONING] Moving slaves to OPERATIONAL...",
+        inst->name);
 
-    if (ecat_master_transition_to_op(inst, &g_logger) != 0)
-    {
-        plugin_logger_error(&g_logger, "Master '%s': Failed to reach OPERATIONAL state",
-                            inst->name);
+    if (ecat_master_transition_to_op(inst, &g_logger) != 0) {
+        plugin_logger_error(&g_logger,
+            "Master '%s': Failed to reach OPERATIONAL state", inst->name);
         ecat_master_close(inst, &g_logger);
         atomic_store(&inst->plugin_state, ECAT_STATE_ERROR);
         return -1;
@@ -812,9 +755,10 @@ static int start_single_master(ecat_master_instance_t *inst)
      * the configured cycle rate. Same scheme as scan_cycle_tracker. */
     {
         int64_t cycle_ns = (int64_t)inst->config.master.cycle_time_us * 1000LL;
-        inst->avg_window = (cycle_ns > 0) ? (ECAT_AVG_TARGET_WINDOW_NS / cycle_ns) : 1;
-        if (inst->avg_window < 1)
-            inst->avg_window = 1;
+        inst->avg_window = (cycle_ns > 0)
+            ? (ECAT_AVG_TARGET_WINDOW_NS / cycle_ns)
+            : 1;
+        if (inst->avg_window < 1) inst->avg_window = 1;
     }
 
     atomic_store(&inst->plugin_state, ECAT_STATE_OPERATIONAL);
@@ -833,12 +777,10 @@ static int start_single_master(ecat_master_instance_t *inst)
     atomic_store(&inst->exchange_skips, 0);
     atomic_store(&inst->monitor_running, true);
 
-    if (pthread_create(&inst->monitor_thread, NULL, ecat_monitor_thread, inst) != 0)
-    {
+    if (pthread_create(&inst->monitor_thread, NULL, ecat_monitor_thread, inst) != 0) {
         plugin_logger_warn(&g_logger,
-                           "Master '%s': Failed to create monitor thread - "
-                           "running without state monitoring",
-                           inst->name);
+            "Master '%s': Failed to create monitor thread - "
+            "running without state monitoring", inst->name);
         atomic_store(&inst->monitor_running, false);
     }
 #endif
@@ -852,29 +794,28 @@ static int start_single_master(ecat_master_instance_t *inst)
      * OPERATIONAL, re-apply the port/module activation SDOs once (PD lengths,
      * Master_Control=3, Class-A power).  Do NOT trigger a re-mapping after
      * this or the config is cleared again. */
-    if (ecat_master_apply_module_activation(inst, &g_logger) != 0)
-    {
-        plugin_logger_warn(&g_logger, "Master '%s': module activation apply reported failure",
-                           inst->name);
+    if (ecat_master_apply_module_activation(inst, &g_logger) != 0) {
+        plugin_logger_warn(&g_logger,
+            "Master '%s': module activation apply reported failure", inst->name);
     }
 
     /* Spawn the dedicated bus thread. SCHED_FIFO + absolute clock_nanosleep
      * driving the SOEM exchange at master.cycle_time_us. */
     atomic_store(&inst->bus_running, true);
-    if (pthread_create(&inst->bus_thread, NULL, ecat_bus_thread, inst) != 0)
-    {
-        plugin_logger_error(&g_logger, "Master '%s': Failed to create bus thread: %s", inst->name,
-                            strerror(errno));
+    if (pthread_create(&inst->bus_thread, NULL, ecat_bus_thread, inst) != 0) {
+        plugin_logger_error(&g_logger,
+            "Master '%s': Failed to create bus thread: %s",
+            inst->name, strerror(errno));
         atomic_store(&inst->bus_running, false);
         atomic_store(&inst->plugin_state, ECAT_STATE_ERROR);
         return -1;
     }
 
     plugin_logger_info(&g_logger,
-                       "Master '%s': [state: OPERATIONAL] EtherCAT master started "
-                       "(dedicated bus thread, cycle=%d us, monitor=%s)",
-                       inst->name, inst->config.master.cycle_time_us,
-                       ECAT_ENABLE_MONITOR_THREAD ? "enabled" : "disabled");
+        "Master '%s': [state: OPERATIONAL] EtherCAT master started "
+        "(dedicated bus thread, cycle=%d us, monitor=%s)",
+        inst->name, inst->config.master.cycle_time_us,
+        ECAT_ENABLE_MONITOR_THREAD ? "enabled" : "disabled");
 
     return 0;
 }
@@ -889,33 +830,34 @@ static int start_single_master(ecat_master_instance_t *inst)
 static void stop_single_master(ecat_master_instance_t *inst)
 {
     int state = atomic_load(&inst->plugin_state);
-    if (state == ECAT_STATE_STOPPED || state == ECAT_STATE_IDLE)
-    {
-        plugin_logger_debug(&g_logger, "Master '%s': already stopped/idle", inst->name);
+    if (state == ECAT_STATE_STOPPED || state == ECAT_STATE_IDLE) {
+        plugin_logger_debug(&g_logger,
+            "Master '%s': already stopped/idle", inst->name);
         return;
     }
 
-    plugin_logger_info(&g_logger, "Master '%s': Stopping (current state: %s)...", inst->name,
-                       ecat_state_to_string(state));
+    plugin_logger_info(&g_logger,
+        "Master '%s': Stopping (current state: %s)...",
+        inst->name, ecat_state_to_string(state));
 
     /* Stop the bus thread first so no further SOEM exchange races with
      * teardown. Signal via the running flag, then SIGUSR1 to wake any
      * in-flight clock_nanosleep, then join. */
-    if (atomic_load(&inst->bus_running))
-    {
+    if (atomic_load(&inst->bus_running)) {
         atomic_store(&inst->bus_running, false);
         pthread_kill(inst->bus_thread, SIGUSR1);
         pthread_join(inst->bus_thread, NULL);
-        plugin_logger_debug(&g_logger, "Master '%s': Bus thread joined", inst->name);
+        plugin_logger_debug(&g_logger,
+            "Master '%s': Bus thread joined", inst->name);
     }
 
 #if ECAT_ENABLE_MONITOR_THREAD
     /* Stop the monitor thread before closing the master */
-    if (atomic_load(&inst->monitor_running))
-    {
+    if (atomic_load(&inst->monitor_running)) {
         atomic_store(&inst->monitor_running, false);
         pthread_join(inst->monitor_thread, NULL);
-        plugin_logger_debug(&g_logger, "Master '%s': Monitor thread joined", inst->name);
+        plugin_logger_debug(&g_logger,
+            "Master '%s': Monitor thread joined", inst->name);
     }
 #endif
 
@@ -926,25 +868,31 @@ static void stop_single_master(ecat_master_instance_t *inst)
         atomic_load_explicit(&inst->diag.cycle_count, memory_order_relaxed);
     uint64_t final_wkc_errors =
         atomic_load_explicit(&inst->diag.wkc_error_count, memory_order_relaxed);
-    int64_t final_sum =
+    int64_t  final_sum =
         atomic_load_explicit(&inst->diag.avg_bus_cycle_ns_sum, memory_order_relaxed);
-    uint64_t final_min = atomic_load_explicit(&inst->diag.min_bus_cycle_ns, memory_order_relaxed);
-    uint64_t final_max = atomic_load_explicit(&inst->diag.max_bus_cycle_ns, memory_order_relaxed);
+    uint64_t final_min =
+        atomic_load_explicit(&inst->diag.min_bus_cycle_ns, memory_order_relaxed);
+    uint64_t final_max =
+        atomic_load_explicit(&inst->diag.max_bus_cycle_ns, memory_order_relaxed);
 
-    if (final_cycle_count > 0 || final_wkc_errors > 0)
-    {
+    if (final_cycle_count > 0 || final_wkc_errors > 0) {
         uint64_t total_cycles = final_cycle_count + final_wkc_errors;
-        int64_t final_avg_ns  = (inst->avg_window > 0) ? final_sum / inst->avg_window : 0;
+        int64_t  final_avg_ns = (inst->avg_window > 0)
+            ? final_sum / inst->avg_window
+            : 0;
         /* min sentinel UINT64_MAX -> "n/a" */
-        unsigned long long min_us =
-            (final_min == UINT64_MAX) ? 0 : (unsigned long long)(final_min / 1000);
+        unsigned long long min_us = (final_min == UINT64_MAX) ? 0
+                                  : (unsigned long long)(final_min / 1000);
         plugin_logger_info(&g_logger,
-                           "Master '%s': Final cycle stats: %llu total (%llu ok, %llu errors), "
-                           "avg=%lld us, min=%llu us, max=%llu us",
-                           inst->name, (unsigned long long)total_cycles,
-                           (unsigned long long)final_cycle_count,
-                           (unsigned long long)final_wkc_errors, (long long)(final_avg_ns / 1000),
-                           min_us, (unsigned long long)(final_max / 1000));
+            "Master '%s': Final cycle stats: %llu total (%llu ok, %llu errors), "
+            "avg=%lld us, min=%llu us, max=%llu us",
+            inst->name,
+            (unsigned long long)total_cycles,
+            (unsigned long long)final_cycle_count,
+            (unsigned long long)final_wkc_errors,
+            (long long)(final_avg_ns / 1000),
+            min_us,
+            (unsigned long long)(final_max / 1000));
     }
 
     /* IP-stack isolation revert happens inside ecat_master_close(). */
@@ -966,8 +914,8 @@ static void stop_single_master(ecat_master_instance_t *inst)
     inst->slaves_snapshot_count = 0;
     pthread_mutex_unlock(&inst->slaves_mutex);
 
-    plugin_logger_info(&g_logger, "Master '%s': [state: STOPPED] EtherCAT master stopped",
-                       inst->name);
+    plugin_logger_info(&g_logger,
+        "Master '%s': [state: STOPPED] EtherCAT master stopped", inst->name);
 }
 
 /**
@@ -1013,8 +961,7 @@ static bool ecat_run_one_cycle(ecat_master_instance_t *inst)
      * yield this cycle.  The bus keeps running with stale I/O data for one
      * cycle.  Trylock is non-blocking; in contention it costs only a futex
      * read and returns immediately. */
-    if (pthread_mutex_trylock(&inst->soem_lock) != 0)
-    {
+    if (pthread_mutex_trylock(&inst->soem_lock) != 0) {
         atomic_fetch_add_explicit(&inst->exchange_skips, 1, memory_order_relaxed);
         return false;
     }
@@ -1026,14 +973,11 @@ static bool ecat_run_one_cycle(ecat_master_instance_t *inst)
      *    image_lock() drains the journal so we read freshly committed %Q.
      *    This is a pure memcpy — microseconds — so we don't hold the
      *    image-tables mutex across the SOEM exchange. */
-    if (g_runtime_args.image_lock && g_runtime_args.image_unlock)
-    {
+    if (g_runtime_args.image_lock && g_runtime_args.image_unlock) {
         g_runtime_args.image_lock();
         ecat_io_write_outputs_fast(&inst->transfer_list, iomap);
         g_runtime_args.image_unlock();
-    }
-    else
-    {
+    } else {
         ecat_io_write_outputs_fast(&inst->transfer_list, iomap);
     }
 
@@ -1067,11 +1011,12 @@ static bool ecat_run_one_cycle(ecat_master_instance_t *inst)
      * not measured. */
     atomic_store_explicit(&inst->diag.bus_cycle_ns, exchange_ns, memory_order_relaxed);
 
-    if (wkc_error)
-    {
-        atomic_fetch_add_explicit(&inst->diag.wkc_error_count, 1, memory_order_relaxed);
+    if (wkc_error) {
+        atomic_fetch_add_explicit(&inst->diag.wkc_error_count, 1,
+                                  memory_order_relaxed);
         if (noframe)
-            atomic_fetch_add_explicit(&inst->diag.noframe_count, 1, memory_order_relaxed);
+            atomic_fetch_add_explicit(&inst->diag.noframe_count, 1,
+                                      memory_order_relaxed);
     }
 
     atomic_fetch_add_explicit(&inst->diag.cycle_count, 1, memory_order_relaxed);
@@ -1082,38 +1027,41 @@ static bool ecat_run_one_cycle(ecat_master_instance_t *inst)
      * the wall-clock smoothing window stays constant regardless of
      * cycle rate.  Sum form avoids the integer-precision stall that
      * `avg += (sample - avg)/N` hits when delta < N. */
-    int64_t cur_sum = atomic_load_explicit(&inst->diag.avg_bus_cycle_ns_sum, memory_order_relaxed);
+    int64_t cur_sum = atomic_load_explicit(&inst->diag.avg_bus_cycle_ns_sum,
+                                           memory_order_relaxed);
     cur_sum += (int64_t)exchange_ns - cur_sum / inst->avg_window;
-    atomic_store_explicit(&inst->diag.avg_bus_cycle_ns_sum, cur_sum, memory_order_relaxed);
+    atomic_store_explicit(&inst->diag.avg_bus_cycle_ns_sum, cur_sum,
+                          memory_order_relaxed);
 
     /* Min/max: single-writer, no CAS needed. */
-    uint64_t cur = atomic_load_explicit(&inst->diag.max_bus_cycle_ns, memory_order_relaxed);
+    uint64_t cur = atomic_load_explicit(&inst->diag.max_bus_cycle_ns,
+                                        memory_order_relaxed);
     if (exchange_ns > cur)
-        atomic_store_explicit(&inst->diag.max_bus_cycle_ns, exchange_ns, memory_order_relaxed);
+        atomic_store_explicit(&inst->diag.max_bus_cycle_ns, exchange_ns,
+                              memory_order_relaxed);
 
-    cur = atomic_load_explicit(&inst->diag.min_bus_cycle_ns, memory_order_relaxed);
+    cur = atomic_load_explicit(&inst->diag.min_bus_cycle_ns,
+                               memory_order_relaxed);
     if (exchange_ns < cur)
-        atomic_store_explicit(&inst->diag.min_bus_cycle_ns, exchange_ns, memory_order_relaxed);
+        atomic_store_explicit(&inst->diag.min_bus_cycle_ns, exchange_ns,
+                              memory_order_relaxed);
 
     /* WKC error tracking.  No plugin_logger_* calls here -- the runtime
      * logger does a synchronous mutex+socket write that would inject
      * jitter in the hot path.  The monitor thread observes these counters
      * and emits the user-facing log messages. */
-    if (wkc_error)
-    {
-        int consec =
-            atomic_fetch_add_explicit(&inst->consecutive_wkc_errors, 1, memory_order_relaxed) + 1;
+    if (wkc_error) {
+        int consec = atomic_fetch_add_explicit(&inst->consecutive_wkc_errors, 1,
+                                               memory_order_relaxed) + 1;
 #if ECAT_ENABLE_MONITOR_THREAD
-        if (state == ECAT_STATE_OPERATIONAL && consec >= ECAT_WKC_ERROR_THRESHOLD)
-        {
+        if (state == ECAT_STATE_OPERATIONAL &&
+            consec >= ECAT_WKC_ERROR_THRESHOLD) {
             atomic_store(&inst->plugin_state, ECAT_STATE_RECOVERING);
         }
 #else
         (void)consec;
 #endif
-    }
-    else
-    {
+    } else {
         atomic_store(&inst->consecutive_wkc_errors, 0);
     }
     return true;
@@ -1164,22 +1112,17 @@ static void *ecat_bus_thread(void *arg)
     /* Apply SCHED_FIFO at the configured priority. Fall back to the
      * default scheduler with a warning rather than refusing to run. */
     int prio = inst->config.master.task_priority;
-    if (prio < 1)
-        prio = 1;
-    if (prio > 99)
-        prio = 99;
+    if (prio < 1)  prio = 1;
+    if (prio > 99) prio = 99;
     struct sched_param sp = {0};
-    sp.sched_priority     = prio;
-    if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &sp) != 0)
-    {
-        plugin_logger_warn(
-            &g_logger,
+    sp.sched_priority = prio;
+    if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &sp) != 0) {
+        plugin_logger_warn(&g_logger,
             "Bus thread '%s': SCHED_FIFO(%d) failed: %s — running with default scheduling",
             inst->name, prio, strerror(errno));
-    }
-    else
-    {
-        plugin_logger_info(&g_logger, "Bus thread '%s': SCHED_FIFO priority %d", inst->name, prio);
+    } else {
+        plugin_logger_info(&g_logger,
+            "Bus thread '%s': SCHED_FIFO priority %d", inst->name, prio);
     }
 
     /* SIGUSR1 handler is process-wide; installed once at plc_main.c.
@@ -1187,22 +1130,21 @@ static void *ecat_bus_thread(void *arg)
      * thread by default (pthread_create inherits the parent's mask, and
      * the process-wide mask doesn't include SIGUSR1). */
 
-    int64_t interval_ns = (int64_t)inst->config.master.cycle_time_us * 1000LL;
-    if (interval_ns <= 0)
-        interval_ns = 1000000LL; /* 1 ms safety floor */
+    int64_t interval_ns =
+        (int64_t)inst->config.master.cycle_time_us * 1000LL;
+    if (interval_ns <= 0) interval_ns = 1000000LL; /* 1 ms safety floor */
 
     /* Seed scheduling-stat min trackers. */
-    atomic_store_explicit(&inst->diag.min_period_ns, UINT64_MAX, memory_order_relaxed);
-    atomic_store_explicit(&inst->diag.min_latency_ns, INT64_MAX, memory_order_relaxed);
+    atomic_store_explicit(&inst->diag.min_period_ns,  UINT64_MAX, memory_order_relaxed);
+    atomic_store_explicit(&inst->diag.min_latency_ns, INT64_MAX,  memory_order_relaxed);
 
     struct timespec next_wakeup;
     clock_gettime(CLOCK_MONOTONIC, &next_wakeup);
 
-    bool have_prev_wake   = false;
-    uint64_t prev_wake_ns = 0;
+    bool     have_prev_wake = false;
+    uint64_t prev_wake_ns   = 0;
 
-    while (atomic_load(&inst->bus_running))
-    {
+    while (atomic_load(&inst->bus_running)) {
         /* Capture actual wake-up time. The first iteration's deadline
          * is "now" so latency should be ~0; meaningful from iteration 2. */
         struct timespec actual_wake;
@@ -1218,39 +1160,45 @@ static void *ecat_bus_thread(void *arg)
         int64_t latency_ns = (int64_t)actual_wake_ns - (int64_t)expected_ns;
         atomic_store_explicit(&inst->diag.latency_ns, latency_ns, memory_order_relaxed);
 
-        int64_t cur_lat_min =
-            atomic_load_explicit(&inst->diag.min_latency_ns, memory_order_relaxed);
+        int64_t cur_lat_min = atomic_load_explicit(&inst->diag.min_latency_ns,
+                                                   memory_order_relaxed);
         if (latency_ns < cur_lat_min)
-            atomic_store_explicit(&inst->diag.min_latency_ns, latency_ns, memory_order_relaxed);
-        int64_t cur_lat_max =
-            atomic_load_explicit(&inst->diag.max_latency_ns, memory_order_relaxed);
+            atomic_store_explicit(&inst->diag.min_latency_ns, latency_ns,
+                                  memory_order_relaxed);
+        int64_t cur_lat_max = atomic_load_explicit(&inst->diag.max_latency_ns,
+                                                   memory_order_relaxed);
         if (latency_ns > cur_lat_max)
-            atomic_store_explicit(&inst->diag.max_latency_ns, latency_ns, memory_order_relaxed);
+            atomic_store_explicit(&inst->diag.max_latency_ns, latency_ns,
+                                  memory_order_relaxed);
 
         /* Time-based EWMA — same scheme as avg_bus_cycle_ns_sum. */
-        int64_t cur_lat_sum =
-            atomic_load_explicit(&inst->diag.avg_latency_ns_sum, memory_order_relaxed);
+        int64_t cur_lat_sum = atomic_load_explicit(&inst->diag.avg_latency_ns_sum,
+                                                   memory_order_relaxed);
         cur_lat_sum += latency_ns - cur_lat_sum / inst->avg_window;
-        atomic_store_explicit(&inst->diag.avg_latency_ns_sum, cur_lat_sum, memory_order_relaxed);
+        atomic_store_explicit(&inst->diag.avg_latency_ns_sum, cur_lat_sum,
+                              memory_order_relaxed);
 
-        if (have_prev_wake)
-        {
+        if (have_prev_wake) {
             uint64_t period_ns = actual_wake_ns - prev_wake_ns;
-            atomic_store_explicit(&inst->diag.period_ns, period_ns, memory_order_relaxed);
+            atomic_store_explicit(&inst->diag.period_ns, period_ns,
+                                  memory_order_relaxed);
 
-            uint64_t cur_per_min =
-                atomic_load_explicit(&inst->diag.min_period_ns, memory_order_relaxed);
+            uint64_t cur_per_min = atomic_load_explicit(&inst->diag.min_period_ns,
+                                                        memory_order_relaxed);
             if (period_ns < cur_per_min)
-                atomic_store_explicit(&inst->diag.min_period_ns, period_ns, memory_order_relaxed);
-            uint64_t cur_per_max =
-                atomic_load_explicit(&inst->diag.max_period_ns, memory_order_relaxed);
+                atomic_store_explicit(&inst->diag.min_period_ns, period_ns,
+                                      memory_order_relaxed);
+            uint64_t cur_per_max = atomic_load_explicit(&inst->diag.max_period_ns,
+                                                        memory_order_relaxed);
             if (period_ns > cur_per_max)
-                atomic_store_explicit(&inst->diag.max_period_ns, period_ns, memory_order_relaxed);
+                atomic_store_explicit(&inst->diag.max_period_ns, period_ns,
+                                      memory_order_relaxed);
 
-            int64_t cur_per_sum =
-                atomic_load_explicit(&inst->diag.avg_period_ns_sum, memory_order_relaxed);
+            int64_t cur_per_sum = atomic_load_explicit(&inst->diag.avg_period_ns_sum,
+                                                       memory_order_relaxed);
             cur_per_sum += (int64_t)period_ns - cur_per_sum / inst->avg_window;
-            atomic_store_explicit(&inst->diag.avg_period_ns_sum, cur_per_sum, memory_order_relaxed);
+            atomic_store_explicit(&inst->diag.avg_period_ns_sum, cur_per_sum,
+                                  memory_order_relaxed);
         }
         prev_wake_ns   = actual_wake_ns;
         have_prev_wake = true;
@@ -1259,20 +1207,20 @@ static void *ecat_bus_thread(void *arg)
         ecat_run_one_cycle(inst);
 
         next_wakeup.tv_nsec += (long)(interval_ns % 1000000000LL);
-        next_wakeup.tv_sec += (time_t)(interval_ns / 1000000000LL);
-        if (next_wakeup.tv_nsec >= 1000000000L)
-        {
+        next_wakeup.tv_sec  += (time_t)(interval_ns / 1000000000LL);
+        if (next_wakeup.tv_nsec >= 1000000000L) {
             next_wakeup.tv_nsec -= 1000000000L;
-            next_wakeup.tv_sec += 1;
+            next_wakeup.tv_sec  += 1;
         }
         int rc = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &next_wakeup, NULL);
-        if (rc == EINTR)
-            continue; /* SIGUSR1 wake — loop will re-check bus_running */
+        if (rc == EINTR) continue; /* SIGUSR1 wake — loop will re-check bus_running */
     }
 
-    plugin_logger_info(
-        &g_logger, "Bus thread '%s': stopped after %llu cycles", inst->name,
-        (unsigned long long)atomic_load_explicit(&inst->diag.cycle_count, memory_order_relaxed));
+    plugin_logger_info(&g_logger,
+        "Bus thread '%s': stopped after %llu cycles",
+        inst->name,
+        (unsigned long long)atomic_load_explicit(&inst->diag.cycle_count,
+                                                 memory_order_relaxed));
     return NULL;
 }
 
@@ -1291,8 +1239,7 @@ int init(void *args)
     plugin_logger_init(&g_logger, "ETHERCAT", NULL);
     plugin_logger_info(&g_logger, "Initializing EtherCAT plugin...");
 
-    if (!args)
-    {
+    if (!args) {
         plugin_logger_error(&g_logger, "init args is NULL");
         return -1;
     }
@@ -1314,33 +1261,27 @@ int init(void *args)
 
     /* Allocate temporary array for parsing (up to ECAT_MAX_MASTERS) */
     ecat_master_instance_t *temp = calloc(ECAT_MAX_MASTERS, sizeof(ecat_master_instance_t));
-    if (!temp)
-    {
+    if (!temp) {
         plugin_logger_error(&g_logger, "Failed to allocate master instances");
         return -1;
     }
 
     int count = 0;
-    if (config_path != NULL && config_path[0] != '\0')
-    {
+    if (config_path != NULL && config_path[0] != '\0') {
         plugin_logger_info(&g_logger, "Loading config: %s", config_path);
         int result = ecat_config_parse_all(config_path, temp, ECAT_MAX_MASTERS, &count);
-        if (result != ECAT_CONFIG_OK || count == 0)
-        {
-            plugin_logger_warn(
-                &g_logger, "No valid EtherCAT configs found (result=%d, count=%d), using defaults",
+        if (result != ECAT_CONFIG_OK || count == 0) {
+            plugin_logger_warn(&g_logger,
+                "No valid EtherCAT configs found (result=%d, count=%d), using defaults",
                 result, count);
             ecat_config_init_defaults(&temp[0].config);
             safe_strcpy_local(temp[0].name, "default", sizeof(temp[0].name));
             count = 1;
+        } else {
+            plugin_logger_info(&g_logger,
+                "Configuration loaded: %d master(s) found", count);
         }
-        else
-        {
-            plugin_logger_info(&g_logger, "Configuration loaded: %d master(s) found", count);
-        }
-    }
-    else
-    {
+    } else {
         plugin_logger_warn(&g_logger, "No config file specified, using defaults");
         ecat_config_init_defaults(&temp[0].config);
         safe_strcpy_local(temp[0].name, "default", sizeof(temp[0].name));
@@ -1348,47 +1289,42 @@ int init(void *args)
     }
 
     /* Store the master instances */
-    g_masters      = temp;
+    g_masters = temp;
     g_master_count = count;
 
     /* Initialize per-master runtime state */
-    for (int i = 0; i < g_master_count; i++)
-    {
+    for (int i = 0; i < g_master_count; i++) {
         ecat_master_instance_t *inst = &g_masters[i];
 
         memset(inst->slaves_snapshot, 0, sizeof(inst->slaves_snapshot));
         inst->slaves_snapshot_count = 0;
         diag_reset(&inst->diag);
-        if (ecat_mutex_init_pi(&inst->slaves_mutex) != 0)
-        {
-            plugin_logger_error(&g_logger, "Master[%d] '%s': Failed to initialize slaves mutex", i,
-                                inst->name);
+        if (ecat_mutex_init_pi(&inst->slaves_mutex) != 0) {
+            plugin_logger_error(&g_logger,
+                "Master[%d] '%s': Failed to initialize slaves mutex", i, inst->name);
             /* Destroy mutexes that were already initialized */
-            for (int j = 0; j < i; j++)
-            {
+            for (int j = 0; j < i; j++) {
                 pthread_mutex_destroy(&g_masters[j].slaves_mutex);
 #if ECAT_ENABLE_MONITOR_THREAD
                 pthread_mutex_destroy(&g_masters[j].soem_lock);
 #endif
             }
             free(g_masters);
-            g_masters      = NULL;
+            g_masters = NULL;
             g_master_count = 0;
             return -1;
         }
 #if ECAT_ENABLE_MONITOR_THREAD
-        if (ecat_mutex_init_pi(&inst->soem_lock) != 0)
-        {
-            plugin_logger_error(&g_logger, "Master[%d] '%s': Failed to initialize SOEM lock", i,
-                                inst->name);
+        if (ecat_mutex_init_pi(&inst->soem_lock) != 0) {
+            plugin_logger_error(&g_logger,
+                "Master[%d] '%s': Failed to initialize SOEM lock", i, inst->name);
             pthread_mutex_destroy(&inst->slaves_mutex);
-            for (int j = 0; j < i; j++)
-            {
+            for (int j = 0; j < i; j++) {
                 pthread_mutex_destroy(&g_masters[j].slaves_mutex);
                 pthread_mutex_destroy(&g_masters[j].soem_lock);
             }
             free(g_masters);
-            g_masters      = NULL;
+            g_masters = NULL;
             g_master_count = 0;
             return -1;
         }
@@ -1401,13 +1337,14 @@ int init(void *args)
 
         atomic_store(&inst->plugin_state, ECAT_STATE_IDLE);
 
-        plugin_logger_info(&g_logger, "Master[%d] '%s': interface=%s, cycle_time=%d us, slaves=%d",
-                           i, inst->name, inst->config.master.interface,
-                           inst->config.master.cycle_time_us, inst->config.slave_count);
+        plugin_logger_info(&g_logger,
+            "Master[%d] '%s': interface=%s, cycle_time=%d us, slaves=%d",
+            i, inst->name, inst->config.master.interface,
+            inst->config.master.cycle_time_us, inst->config.slave_count);
     }
 
-    plugin_logger_info(&g_logger, "EtherCAT plugin initialized [%d master(s), state: IDLE]",
-                       g_master_count);
+    plugin_logger_info(&g_logger,
+        "EtherCAT plugin initialized [%d master(s), state: IDLE]", g_master_count);
 
     return 0;
 }
@@ -1421,29 +1358,17 @@ int init(void *args)
 /**
  * @brief Compute the byte range [start, end) occupied by a channel map entry
  */
-static void entry_byte_range(const ecat_channel_map_entry_t *e, int *start, int *end)
+static void entry_byte_range(const ecat_channel_map_entry_t *e,
+                             int *start, int *end)
 {
     *start = e->byte_index;
-    switch (e->size)
-    {
-    case IEC_SIZE_BIT:
-        *end = e->byte_index + 1;
-        break;
-    case IEC_SIZE_BYTE:
-        *end = e->byte_index + 1;
-        break;
-    case IEC_SIZE_WORD:
-        *end = e->byte_index + 2;
-        break;
-    case IEC_SIZE_DWORD:
-        *end = e->byte_index + 4;
-        break;
-    case IEC_SIZE_LWORD:
-        *end = e->byte_index + 8;
-        break;
-    default:
-        *end = e->byte_index + 1;
-        break;
+    switch (e->size) {
+    case IEC_SIZE_BIT:   *end = e->byte_index + 1; break;
+    case IEC_SIZE_BYTE:  *end = e->byte_index + 1; break;
+    case IEC_SIZE_WORD:  *end = e->byte_index + 2; break;
+    case IEC_SIZE_DWORD: *end = e->byte_index + 4; break;
+    case IEC_SIZE_LWORD: *end = e->byte_index + 8; break;
+    default:             *end = e->byte_index + 1; break;
     }
 }
 
@@ -1452,7 +1377,8 @@ static void entry_byte_range(const ecat_channel_map_entry_t *e, int *start, int 
  *
  * For bit-sized entries at the same byte, also checks bit_index equality.
  */
-static bool entries_overlap(const ecat_channel_map_entry_t *a, const ecat_channel_map_entry_t *b)
+static bool entries_overlap(const ecat_channel_map_entry_t *a,
+                            const ecat_channel_map_entry_t *b)
 {
     int a_start, a_end, b_start, b_end;
     entry_byte_range(a, &a_start, &a_end);
@@ -1461,8 +1387,8 @@ static bool entries_overlap(const ecat_channel_map_entry_t *a, const ecat_channe
     if (a_end <= b_start || b_end <= a_start)
         return false;
 
-    if (a->size == IEC_SIZE_BIT && b->size == IEC_SIZE_BIT && a->byte_index == b->byte_index)
-    {
+    if (a->size == IEC_SIZE_BIT && b->size == IEC_SIZE_BIT
+        && a->byte_index == b->byte_index) {
         return a->bit_index == b->bit_index;
     }
 
@@ -1482,42 +1408,38 @@ static void warn_address_overlap(void)
 
     int conflicts = 0;
 
-    for (int i = 0; i < g_master_count; i++)
-    {
-        for (int j = i + 1; j < g_master_count; j++)
-        {
+    for (int i = 0; i < g_master_count; i++) {
+        for (int j = i + 1; j < g_master_count; j++) {
             /* Check inputs */
-            for (int ai = 0; ai < g_masters[i].channel_map.input_count; ai++)
-            {
-                for (int bj = 0; bj < g_masters[j].channel_map.input_count; bj++)
-                {
+            for (int ai = 0; ai < g_masters[i].channel_map.input_count; ai++) {
+                for (int bj = 0; bj < g_masters[j].channel_map.input_count; bj++) {
                     if (entries_overlap(&g_masters[i].channel_map.inputs[ai],
-                                        &g_masters[j].channel_map.inputs[bj]))
-                    {
-                        const ecat_channel_map_entry_t *a = &g_masters[i].channel_map.inputs[ai];
+                                        &g_masters[j].channel_map.inputs[bj])) {
+                        const ecat_channel_map_entry_t *a =
+                            &g_masters[i].channel_map.inputs[ai];
                         plugin_logger_warn(&g_logger,
-                                           "IEC address overlap: %%I*%d.%d mapped by both "
-                                           "master '%s' and master '%s'",
-                                           a->byte_index, a->bit_index >= 0 ? a->bit_index : 0,
-                                           g_masters[i].name, g_masters[j].name);
+                            "IEC address overlap: %%I*%d.%d mapped by both "
+                            "master '%s' and master '%s'",
+                            a->byte_index,
+                            a->bit_index >= 0 ? a->bit_index : 0,
+                            g_masters[i].name, g_masters[j].name);
                         conflicts++;
                     }
                 }
             }
             /* Check outputs */
-            for (int ai = 0; ai < g_masters[i].channel_map.output_count; ai++)
-            {
-                for (int bj = 0; bj < g_masters[j].channel_map.output_count; bj++)
-                {
+            for (int ai = 0; ai < g_masters[i].channel_map.output_count; ai++) {
+                for (int bj = 0; bj < g_masters[j].channel_map.output_count; bj++) {
                     if (entries_overlap(&g_masters[i].channel_map.outputs[ai],
-                                        &g_masters[j].channel_map.outputs[bj]))
-                    {
-                        const ecat_channel_map_entry_t *a = &g_masters[i].channel_map.outputs[ai];
+                                        &g_masters[j].channel_map.outputs[bj])) {
+                        const ecat_channel_map_entry_t *a =
+                            &g_masters[i].channel_map.outputs[ai];
                         plugin_logger_warn(&g_logger,
-                                           "IEC address overlap: %%Q*%d.%d mapped by both "
-                                           "master '%s' and master '%s'",
-                                           a->byte_index, a->bit_index >= 0 ? a->bit_index : 0,
-                                           g_masters[i].name, g_masters[j].name);
+                            "IEC address overlap: %%Q*%d.%d mapped by both "
+                            "master '%s' and master '%s'",
+                            a->byte_index,
+                            a->bit_index >= 0 ? a->bit_index : 0,
+                            g_masters[i].name, g_masters[j].name);
                         conflicts++;
                     }
                 }
@@ -1525,12 +1447,11 @@ static void warn_address_overlap(void)
         }
     }
 
-    if (conflicts > 0)
-    {
+    if (conflicts > 0) {
         plugin_logger_warn(&g_logger,
-                           "%d IEC address overlap(s) detected between masters. "
-                           "The last master in cycle order will overwrite shared addresses.",
-                           conflicts);
+            "%d IEC address overlap(s) detected between masters. "
+            "The last master in cycle order will overwrite shared addresses.",
+            conflicts);
     }
 }
 
@@ -1544,33 +1465,32 @@ int start_loop(void)
 {
     int any_started = 0;
 
-    for (int i = 0; i < g_master_count; i++)
-    {
+    for (int i = 0; i < g_master_count; i++) {
         ecat_master_instance_t *inst = &g_masters[i];
 
         int state = atomic_load(&inst->plugin_state);
-        if (state != ECAT_STATE_IDLE && state != ECAT_STATE_STOPPED)
-        {
-            plugin_logger_error(&g_logger, "Master '%s': Cannot start - invalid state: %s",
-                                inst->name, ecat_state_to_string(state));
+        if (state != ECAT_STATE_IDLE && state != ECAT_STATE_STOPPED) {
+            plugin_logger_error(&g_logger,
+                "Master '%s': Cannot start - invalid state: %s",
+                inst->name, ecat_state_to_string(state));
             continue;
         }
 
-        if (start_single_master(inst) == 0)
-        {
+        if (start_single_master(inst) == 0) {
             any_started++;
         }
     }
 
-    if (any_started == 0)
-    {
-        plugin_logger_error(&g_logger, "No EtherCAT masters started successfully");
+    if (any_started == 0) {
+        plugin_logger_error(&g_logger,
+            "No EtherCAT masters started successfully");
         return -1;
     }
 
     warn_address_overlap();
 
-    plugin_logger_info(&g_logger, "%d/%d EtherCAT master(s) started", any_started, g_master_count);
+    plugin_logger_info(&g_logger, "%d/%d EtherCAT master(s) started",
+                       any_started, g_master_count);
     return 0;
 }
 
@@ -1581,8 +1501,7 @@ void stop_loop(void)
 {
     plugin_logger_info(&g_logger, "Stopping all EtherCAT masters...");
 
-    for (int i = 0; i < g_master_count; i++)
-    {
+    for (int i = 0; i < g_master_count; i++) {
         stop_single_master(&g_masters[i]);
     }
 
@@ -1596,12 +1515,10 @@ void cleanup(void)
 {
     plugin_logger_info(&g_logger, "Cleaning up EtherCAT plugin...");
 
-    for (int i = 0; i < g_master_count; i++)
-    {
+    for (int i = 0; i < g_master_count; i++) {
         ecat_master_instance_t *inst = &g_masters[i];
-        int state                    = atomic_load(&inst->plugin_state);
-        if (state != ECAT_STATE_STOPPED && state != ECAT_STATE_IDLE)
-        {
+        int state = atomic_load(&inst->plugin_state);
+        if (state != ECAT_STATE_STOPPED && state != ECAT_STATE_IDLE) {
             stop_single_master(inst);
         }
         pthread_mutex_destroy(&inst->slaves_mutex);
@@ -1611,7 +1528,7 @@ void cleanup(void)
     }
 
     free(g_masters);
-    g_masters      = NULL;
+    g_masters = NULL;
     g_master_count = 0;
 
     plugin_logger_info(&g_logger, "EtherCAT plugin cleanup complete");
@@ -1642,13 +1559,11 @@ void cleanup(void)
 static int validate_interface_name(const char *ifname, char *response, size_t response_size)
 {
     size_t ifname_len = strlen(ifname);
-    if (ifname_len == 0 || ifname_len >= ECAT_IFNAME_MAX)
-    {
+    if (ifname_len == 0 || ifname_len >= ECAT_IFNAME_MAX) {
         snprintf(response, response_size, "{\"error\":\"invalid interface name length\"}");
         return -1;
     }
-    if (!ecat_iface_validate(ifname, ECAT_IFACE_ANY_PLATFORM))
-    {
+    if (!ecat_iface_validate(ifname, ECAT_IFACE_ANY_PLATFORM)) {
         snprintf(response, response_size, "{\"error\":\"invalid interface name format\"}");
         return -1;
     }
@@ -1662,12 +1577,10 @@ static int validate_interface_name(const char *ifname, char *response, size_t re
  */
 static bool any_master_active(void)
 {
-    for (int i = 0; i < g_master_count; i++)
-    {
+    for (int i = 0; i < g_master_count; i++) {
         int state = atomic_load(&g_masters[i].plugin_state);
         if (state == ECAT_STATE_OPERATIONAL || state == ECAT_STATE_RECOVERING ||
-            state == ECAT_STATE_TRANSITIONING)
-        {
+            state == ECAT_STATE_TRANSITIONING) {
             return true;
         }
     }
@@ -1683,10 +1596,9 @@ static bool any_master_active(void)
 static int handle_scan_command(cJSON *root, char *response, size_t response_size)
 {
     cJSON *params = cJSON_GetObjectItemCaseSensitive(root, "params");
-    cJSON *iface  = params ? cJSON_GetObjectItemCaseSensitive(params, "interface") : NULL;
+    cJSON *iface = params ? cJSON_GetObjectItemCaseSensitive(params, "interface") : NULL;
 
-    if (!iface || !cJSON_IsString(iface))
-    {
+    if (!iface || !cJSON_IsString(iface)) {
         snprintf(response, response_size, "{\"error\":\"missing 'interface' param\"}");
         return -1;
     }
@@ -1695,10 +1607,9 @@ static int handle_scan_command(cJSON *root, char *response, size_t response_size
         return -1;
 
     /* Refuse scan while any master is actively running on the bus */
-    if (any_master_active())
-    {
+    if (any_master_active()) {
         snprintf(response, response_size,
-                 "{\"error\":\"EtherCAT master is running. Stop the PLC before scanning.\"}");
+            "{\"error\":\"EtherCAT master is running. Stop the PLC before scanning.\"}");
         return -1;
     }
 
@@ -1706,20 +1617,17 @@ static int handle_scan_command(cJSON *root, char *response, size_t response_size
     ecx_contextt scan_ctx;
     memset(&scan_ctx, 0, sizeof(scan_ctx));
 
-    if (!ecx_init(&scan_ctx, iface->valuestring))
-    {
-        snprintf(response, response_size, "{\"error\":\"Failed to open interface '%s'\"}",
-                 iface->valuestring);
+    if (!ecx_init(&scan_ctx, iface->valuestring)) {
+        snprintf(response, response_size,
+            "{\"error\":\"Failed to open interface '%s'\"}", iface->valuestring);
         return -1;
     }
 
     int slave_count = ecx_config_init(&scan_ctx);
-    if (slave_count <= 0)
-    {
+    if (slave_count <= 0) {
         ecx_close(&scan_ctx);
         snprintf(response, response_size,
-                 "{\"status\":\"success\",\"devices\":[],\"message\":\"No slaves "
-                 "found\",\"slave_count\":0}");
+            "{\"status\":\"success\",\"devices\":[],\"message\":\"No slaves found\",\"slave_count\":0}");
         return 0;
     }
 
@@ -1728,10 +1636,9 @@ static int handle_scan_command(cJSON *root, char *response, size_t response_size
     cJSON_AddStringToObject(resp, "status", "success");
     cJSON *devices = cJSON_AddArrayToObject(resp, "devices");
 
-    for (int i = 1; i <= scan_ctx.slavecount; i++)
-    {
+    for (int i = 1; i <= scan_ctx.slavecount; i++) {
         ec_slavet *s = &scan_ctx.slavelist[i];
-        cJSON *dev   = cJSON_CreateObject();
+        cJSON *dev = cJSON_CreateObject();
         cJSON_AddNumberToObject(dev, "position", i);
         cJSON_AddStringToObject(dev, "name", s->name);
         cJSON_AddNumberToObject(dev, "vendor_id", s->eep_man);
@@ -1752,8 +1659,7 @@ static int handle_scan_command(cJSON *root, char *response, size_t response_size
     cJSON_AddNumberToObject(resp, "slave_count", scan_ctx.slavecount);
 
     char *json_str = cJSON_PrintUnformatted(resp);
-    if (json_str)
-    {
+    if (json_str) {
         snprintf(response, response_size, "%s", json_str);
         free(json_str);
     }
@@ -1778,8 +1684,7 @@ static int handle_list_interfaces_command(char *response, size_t response_size)
     cJSON *ifaces = cJSON_AddArrayToObject(resp, "interfaces");
 
     int count = 0;
-    for (ec_adaptert *a = adapters; a != NULL; a = a->next)
-    {
+    for (ec_adaptert *a = adapters; a != NULL; a = a->next) {
         cJSON *entry = cJSON_CreateObject();
         cJSON_AddStringToObject(entry, "name", a->name);
         cJSON_AddStringToObject(entry, "description", a->desc);
@@ -1792,8 +1697,7 @@ static int handle_list_interfaces_command(char *response, size_t response_size)
     cJSON_AddStringToObject(resp, "message", msg);
 
     char *json_str = cJSON_PrintUnformatted(resp);
-    if (json_str)
-    {
+    if (json_str) {
         snprintf(response, response_size, "%s", json_str);
         free(json_str);
     }
@@ -1813,23 +1717,20 @@ static int handle_list_interfaces_command(char *response, size_t response_size)
 static int handle_test_command(cJSON *root, char *response, size_t response_size)
 {
     cJSON *params = cJSON_GetObjectItemCaseSensitive(root, "params");
-    cJSON *iface  = params ? cJSON_GetObjectItemCaseSensitive(params, "interface") : NULL;
-    cJSON *pos    = params ? cJSON_GetObjectItemCaseSensitive(params, "position") : NULL;
+    cJSON *iface = params ? cJSON_GetObjectItemCaseSensitive(params, "interface") : NULL;
+    cJSON *pos = params ? cJSON_GetObjectItemCaseSensitive(params, "position") : NULL;
 
-    if (!iface || !cJSON_IsString(iface))
-    {
+    if (!iface || !cJSON_IsString(iface)) {
         snprintf(response, response_size, "{\"error\":\"missing 'interface' param\"}");
         return -1;
     }
-    if (!pos || !cJSON_IsNumber(pos))
-    {
+    if (!pos || !cJSON_IsNumber(pos)) {
         snprintf(response, response_size, "{\"error\":\"missing 'position' param\"}");
         return -1;
     }
 
     int position = pos->valueint;
-    if (position < 1)
-    {
+    if (position < 1) {
         snprintf(response, response_size, "{\"error\":\"'position' must be a positive integer\"}");
         return -1;
     }
@@ -1838,43 +1739,39 @@ static int handle_test_command(cJSON *root, char *response, size_t response_size
         return -1;
 
     /* Refuse test while any master is actively running on the bus */
-    if (any_master_active())
-    {
+    if (any_master_active()) {
         snprintf(response, response_size,
-                 "{\"error\":\"EtherCAT master is running. Stop the PLC before testing.\"}");
+            "{\"error\":\"EtherCAT master is running. Stop the PLC before testing.\"}");
         return -1;
     }
 
     ecx_contextt test_ctx;
     memset(&test_ctx, 0, sizeof(test_ctx));
 
-    if (!ecx_init(&test_ctx, iface->valuestring))
-    {
-        snprintf(response, response_size, "{\"error\":\"Failed to open interface '%s'\"}",
-                 iface->valuestring);
+    if (!ecx_init(&test_ctx, iface->valuestring)) {
+        snprintf(response, response_size,
+            "{\"error\":\"Failed to open interface '%s'\"}", iface->valuestring);
         return -1;
     }
 
     int slave_count = ecx_config_init(&test_ctx);
-    if (slave_count <= 0)
-    {
+    if (slave_count <= 0) {
         ecx_close(&test_ctx);
         snprintf(response, response_size,
-                 "{\"status\":\"success\",\"connected\":false,\"device\":null,"
-                 "\"message\":\"No EtherCAT slaves found on the network\"}");
+            "{\"status\":\"success\",\"connected\":false,\"device\":null,"
+            "\"message\":\"No EtherCAT slaves found on the network\"}");
         return 0;
     }
 
-    if (position > test_ctx.slavecount)
-    {
+    if (position > test_ctx.slavecount) {
         char errmsg[128];
-        snprintf(errmsg, sizeof(errmsg), "No device at position %d. Found %d slave(s).", position,
-                 test_ctx.slavecount);
+        snprintf(errmsg, sizeof(errmsg),
+            "No device at position %d. Found %d slave(s).",
+            position, test_ctx.slavecount);
         ecx_close(&test_ctx);
         snprintf(response, response_size,
-                 "{\"status\":\"error\",\"connected\":false,\"device\":null,"
-                 "\"message\":\"%s\"}",
-                 errmsg);
+            "{\"status\":\"error\",\"connected\":false,\"device\":null,"
+            "\"message\":\"%s\"}", errmsg);
         return -1;
     }
 
@@ -1899,12 +1796,12 @@ static int handle_test_command(cJSON *root, char *response, size_t response_size
     cJSON_AddItemToObject(resp, "device", dev);
 
     char msg[128];
-    snprintf(msg, sizeof(msg), "Successfully connected to %s at position %d", s->name, position);
+    snprintf(msg, sizeof(msg),
+        "Successfully connected to %s at position %d", s->name, position);
     cJSON_AddStringToObject(resp, "message", msg);
 
     char *json_str = cJSON_PrintUnformatted(resp);
-    if (json_str)
-    {
+    if (json_str) {
         snprintf(response, response_size, "%s", json_str);
         free(json_str);
     }
@@ -1920,8 +1817,7 @@ static int handle_test_command(cJSON *root, char *response, size_t response_size
  * Used only by the JSON builders to avoid repeating the same atomic_load
  * sequence twice.  Cross-field tearing is acceptable for diagnostics.
  */
-typedef struct
-{
+typedef struct {
     uint64_t cycle_count;
     uint64_t wkc_error_count;
     uint64_t noframe_count;
@@ -1935,19 +1831,23 @@ typedef struct
      *              configured cycle_us on a healthy RT system)
      * latency_us — wake-up delay vs clock_nanosleep deadline; spikes
      *              point at OS jitter, not bus or PLC issues. */
-    int64_t avg_period_us;
-    int64_t max_period_us;
-    int64_t min_period_us;
-    int64_t avg_latency_us;
-    int64_t max_latency_us;
-    int64_t min_latency_us;
+    int64_t  avg_period_us;
+    int64_t  max_period_us;
+    int64_t  min_period_us;
+    int64_t  avg_latency_us;
+    int64_t  max_latency_us;
+    int64_t  min_latency_us;
 } ecat_diag_view_t;
 
-static void load_diag_view(const ecat_master_instance_t *inst, ecat_diag_view_t *out)
+static void load_diag_view(const ecat_master_instance_t *inst,
+                           ecat_diag_view_t *out)
 {
-    out->cycle_count     = atomic_load_explicit(&inst->diag.cycle_count, memory_order_relaxed);
-    out->wkc_error_count = atomic_load_explicit(&inst->diag.wkc_error_count, memory_order_relaxed);
-    out->noframe_count   = atomic_load_explicit(&inst->diag.noframe_count, memory_order_relaxed);
+    out->cycle_count = atomic_load_explicit(&inst->diag.cycle_count,
+                                            memory_order_relaxed);
+    out->wkc_error_count = atomic_load_explicit(&inst->diag.wkc_error_count,
+                                                memory_order_relaxed);
+    out->noframe_count = atomic_load_explicit(&inst->diag.noframe_count,
+                                              memory_order_relaxed);
 
     /* Time-based EWMA: divide the stored sum by the master's avg_window
      * to recover the moving average.  Single bus_cycle_ns measurement
@@ -1955,13 +1855,16 @@ static void load_diag_view(const ecat_master_instance_t *inst, ecat_diag_view_t 
      * min/max_exchange_us) for JSON compatibility with the Editor. */
     int64_t window = inst->avg_window > 0 ? inst->avg_window : 1;
 
-    int64_t bus_sum = atomic_load_explicit(&inst->diag.avg_bus_cycle_ns_sum, memory_order_relaxed);
+    int64_t bus_sum = atomic_load_explicit(&inst->diag.avg_bus_cycle_ns_sum,
+                                           memory_order_relaxed);
     out->avg_cycle_us = (uint64_t)((bus_sum / window) / 1000);
 
-    uint64_t min_bcn = atomic_load_explicit(&inst->diag.min_bus_cycle_ns, memory_order_relaxed);
-    uint64_t max_bcn = atomic_load_explicit(&inst->diag.max_bus_cycle_ns, memory_order_relaxed);
-    uint64_t min_us  = (min_bcn == UINT64_MAX) ? 0 : min_bcn / 1000;
-    uint64_t max_us  = max_bcn / 1000;
+    uint64_t min_bcn = atomic_load_explicit(&inst->diag.min_bus_cycle_ns,
+                                            memory_order_relaxed);
+    uint64_t max_bcn = atomic_load_explicit(&inst->diag.max_bus_cycle_ns,
+                                            memory_order_relaxed);
+    uint64_t min_us = (min_bcn == UINT64_MAX) ? 0 : min_bcn / 1000;
+    uint64_t max_us = max_bcn / 1000;
 
     out->min_cycle_us    = min_us;
     out->max_cycle_us    = max_us;
@@ -1969,16 +1872,23 @@ static void load_diag_view(const ecat_master_instance_t *inst, ecat_diag_view_t 
     out->max_exchange_us = max_us;
 
     /* Scheduling stats — captured by the bus thread itself. */
-    int64_t per_sum     = atomic_load_explicit(&inst->diag.avg_period_ns_sum, memory_order_relaxed);
-    uint64_t min_per_ns = atomic_load_explicit(&inst->diag.min_period_ns, memory_order_relaxed);
-    uint64_t max_per_ns = atomic_load_explicit(&inst->diag.max_period_ns, memory_order_relaxed);
-    int64_t lat_sum    = atomic_load_explicit(&inst->diag.avg_latency_ns_sum, memory_order_relaxed);
-    int64_t min_lat_ns = atomic_load_explicit(&inst->diag.min_latency_ns, memory_order_relaxed);
-    int64_t max_lat_ns = atomic_load_explicit(&inst->diag.max_latency_ns, memory_order_relaxed);
+    int64_t  per_sum    = atomic_load_explicit(&inst->diag.avg_period_ns_sum,
+                                               memory_order_relaxed);
+    uint64_t min_per_ns = atomic_load_explicit(&inst->diag.min_period_ns,
+                                               memory_order_relaxed);
+    uint64_t max_per_ns = atomic_load_explicit(&inst->diag.max_period_ns,
+                                               memory_order_relaxed);
+    int64_t  lat_sum    = atomic_load_explicit(&inst->diag.avg_latency_ns_sum,
+                                               memory_order_relaxed);
+    int64_t  min_lat_ns = atomic_load_explicit(&inst->diag.min_latency_ns,
+                                               memory_order_relaxed);
+    int64_t  max_lat_ns = atomic_load_explicit(&inst->diag.max_latency_ns,
+                                               memory_order_relaxed);
 
     out->avg_period_us  = (per_sum / window) / 1000;
     out->max_period_us  = (int64_t)(max_per_ns / 1000);
-    out->min_period_us  = (min_per_ns == UINT64_MAX) ? 0 : (int64_t)(min_per_ns / 1000);
+    out->min_period_us  = (min_per_ns == UINT64_MAX) ? 0
+                                                     : (int64_t)(min_per_ns / 1000);
     out->avg_latency_us = (lat_sum / window) / 1000;
     out->max_latency_us = max_lat_ns / 1000;
     out->min_latency_us = (min_lat_ns == INT64_MAX) ? 0 : min_lat_ns / 1000;
@@ -1989,8 +1899,8 @@ static void load_diag_view(const ecat_master_instance_t *inst, ecat_diag_view_t 
  *
  * @param diagnostics Include extra fields (al_state_raw) when true.
  */
-static void add_slaves_json(ecat_master_instance_t *inst, cJSON *master, int *out_count,
-                            bool diagnostics)
+static void add_slaves_json(ecat_master_instance_t *inst, cJSON *master,
+                            int *out_count, bool diagnostics)
 {
     ecat_slave_status_t local[ECAT_MAX_SLAVES];
     int n;
@@ -2005,10 +1915,9 @@ static void add_slaves_json(ecat_master_instance_t *inst, cJSON *master, int *ou
     *out_count = n;
 
     cJSON *slaves = cJSON_AddArrayToObject(master, "slaves");
-    for (int i = 0; i < n; i++)
-    {
+    for (int i = 0; i < n; i++) {
         const ecat_slave_status_t *ss = &local[i];
-        cJSON *slave                  = cJSON_CreateObject();
+        cJSON *slave = cJSON_CreateObject();
         cJSON_AddNumberToObject(slave, "position", ss->position);
         cJSON_AddStringToObject(slave, "name", ss->name);
         cJSON_AddStringToObject(slave, "state", al_state_to_string(ss->al_state));
@@ -2018,7 +1927,7 @@ static void add_slaves_json(ecat_master_instance_t *inst, cJSON *master, int *ou
         cJSON_AddNumberToObject(slave, "error_count", ss->error_count);
         cJSON_AddBoolToObject(slave, "has_error",
                               (ss->al_state & EC_STATE_ERROR) != 0 ||
-                                  ss->al_state != EC_STATE_OPERATIONAL);
+                              ss->al_state != EC_STATE_OPERATIONAL);
         cJSON_AddItemToArray(slaves, slave);
     }
 }
@@ -2032,9 +1941,10 @@ static void add_slaves_json(ecat_master_instance_t *inst, cJSON *master, int *ou
  */
 static cJSON *build_master_status_json(ecat_master_instance_t *inst)
 {
-    ecat_plugin_state_t state = (ecat_plugin_state_t)atomic_load(&inst->plugin_state);
-    int consecutive_wkc       = atomic_load(&inst->consecutive_wkc_errors);
-    int recovery_attempts     = atomic_load(&inst->recovery_attempts);
+    ecat_plugin_state_t state =
+        (ecat_plugin_state_t)atomic_load(&inst->plugin_state);
+    int consecutive_wkc = atomic_load(&inst->consecutive_wkc_errors);
+    int recovery_attempts = atomic_load(&inst->recovery_attempts);
 #if ECAT_ENABLE_MONITOR_THREAD
     uint64_t exchange_skips = atomic_load(&inst->exchange_skips);
 #else
@@ -2090,14 +2000,12 @@ static int handle_status_command(char *response, size_t response_size)
     cJSON *resp = cJSON_CreateObject();
 
     cJSON *masters_arr = cJSON_AddArrayToObject(resp, "masters");
-    for (int i = 0; i < g_master_count; i++)
-    {
+    for (int i = 0; i < g_master_count; i++) {
         cJSON_AddItemToArray(masters_arr, build_master_status_json(&g_masters[i]));
     }
 
     char *json_str = cJSON_PrintUnformatted(resp);
-    if (json_str)
-    {
+    if (json_str) {
         snprintf(response, response_size, "%s", json_str);
         free(json_str);
     }
@@ -2111,9 +2019,10 @@ static int handle_status_command(char *response, size_t response_size)
  */
 static cJSON *build_master_diagnostics_json(ecat_master_instance_t *inst)
 {
-    ecat_plugin_state_t state = (ecat_plugin_state_t)atomic_load(&inst->plugin_state);
-    int consecutive_wkc       = atomic_load(&inst->consecutive_wkc_errors);
-    int recovery_attempts     = atomic_load(&inst->recovery_attempts);
+    ecat_plugin_state_t state =
+        (ecat_plugin_state_t)atomic_load(&inst->plugin_state);
+    int consecutive_wkc = atomic_load(&inst->consecutive_wkc_errors);
+    int recovery_attempts = atomic_load(&inst->recovery_attempts);
 #if ECAT_ENABLE_MONITOR_THREAD
     uint64_t exchange_skips = atomic_load(&inst->exchange_skips);
 #else
@@ -2161,7 +2070,8 @@ static cJSON *build_master_diagnostics_json(ecat_master_instance_t *inst)
     cJSON_AddNumberToObject(timing, "avg_latency_us", (double)diag.avg_latency_us);
     cJSON_AddNumberToObject(timing, "max_latency_us", (double)diag.max_latency_us);
     cJSON_AddNumberToObject(timing, "min_latency_us", (double)diag.min_latency_us);
-    cJSON_AddNumberToObject(timing, "configured_cycle_us", inst->config.master.cycle_time_us);
+    cJSON_AddNumberToObject(timing, "configured_cycle_us",
+                            inst->config.master.cycle_time_us);
     cJSON_AddNumberToObject(timing, "receive_timeout_us", inst->receive_timeout_us);
     cJSON_AddItemToObject(master, "timing", timing);
 
@@ -2173,13 +2083,14 @@ static cJSON *build_master_diagnostics_json(ecat_master_instance_t *inst)
     cJSON_AddNumberToObject(recovery, "wkc_error_threshold", ECAT_WKC_ERROR_THRESHOLD);
     cJSON_AddNumberToObject(recovery, "exchange_skips", (double)exchange_skips);
     cJSON_AddNumberToObject(recovery, "writestate_failures",
-                            (double)atomic_load(&inst->recovery_writestate_failures));
+        (double)atomic_load(&inst->recovery_writestate_failures));
     cJSON_AddItemToObject(master, "recovery", recovery);
 
     /* Master configuration */
     cJSON *master_cfg = cJSON_CreateObject();
     cJSON_AddStringToObject(master_cfg, "interface", inst->config.master.interface);
-    cJSON_AddNumberToObject(master_cfg, "cycle_time_us", inst->config.master.cycle_time_us);
+    cJSON_AddNumberToObject(master_cfg, "cycle_time_us",
+                            inst->config.master.cycle_time_us);
     cJSON_AddNumberToObject(master_cfg, "watchdog_timeout_cycles",
                             inst->config.master.watchdog_timeout_cycles);
     cJSON_AddItemToObject(master, "master_config", master_cfg);
@@ -2197,14 +2108,13 @@ static int handle_diagnostics_command(char *response, size_t response_size)
     cJSON *resp = cJSON_CreateObject();
 
     cJSON *masters_arr = cJSON_AddArrayToObject(resp, "masters");
-    for (int i = 0; i < g_master_count; i++)
-    {
-        cJSON_AddItemToArray(masters_arr, build_master_diagnostics_json(&g_masters[i]));
+    for (int i = 0; i < g_master_count; i++) {
+        cJSON_AddItemToArray(masters_arr,
+                             build_master_diagnostics_json(&g_masters[i]));
     }
 
     char *json_str = cJSON_PrintUnformatted(resp);
-    if (json_str)
-    {
+    if (json_str) {
         snprintf(response, response_size, "%s", json_str);
         free(json_str);
     }
@@ -2219,43 +2129,30 @@ static int handle_diagnostics_command(char *response, size_t response_size)
 int execute_command(const char *command_json, char *response, size_t response_size)
 {
     cJSON *root = cJSON_Parse(command_json);
-    if (!root)
-    {
+    if (!root) {
         snprintf(response, response_size, "{\"error\":\"invalid JSON\"}");
         return -1;
     }
 
     cJSON *cmd = cJSON_GetObjectItemCaseSensitive(root, "command");
-    if (!cmd || !cJSON_IsString(cmd))
-    {
+    if (!cmd || !cJSON_IsString(cmd)) {
         cJSON_Delete(root);
         snprintf(response, response_size, "{\"error\":\"missing 'command' field\"}");
         return -1;
     }
 
     int result = -1;
-    if (strcmp(cmd->valuestring, "scan") == 0)
-    {
+    if (strcmp(cmd->valuestring, "scan") == 0) {
         result = handle_scan_command(root, response, response_size);
-    }
-    else if (strcmp(cmd->valuestring, "list-interfaces") == 0)
-    {
+    } else if (strcmp(cmd->valuestring, "list-interfaces") == 0) {
         result = handle_list_interfaces_command(response, response_size);
-    }
-    else if (strcmp(cmd->valuestring, "test") == 0)
-    {
+    } else if (strcmp(cmd->valuestring, "test") == 0) {
         result = handle_test_command(root, response, response_size);
-    }
-    else if (strcmp(cmd->valuestring, "status") == 0)
-    {
+    } else if (strcmp(cmd->valuestring, "status") == 0) {
         result = handle_status_command(response, response_size);
-    }
-    else if (strcmp(cmd->valuestring, "diagnostics") == 0)
-    {
+    } else if (strcmp(cmd->valuestring, "diagnostics") == 0) {
         result = handle_diagnostics_command(response, response_size);
-    }
-    else
-    {
+    } else {
         snprintf(response, response_size, "{\"error\":\"unknown command '%s'\"}", cmd->valuestring);
     }
 
