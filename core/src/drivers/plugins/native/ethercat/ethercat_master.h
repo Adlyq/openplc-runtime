@@ -73,12 +73,16 @@ int ecat_master_configure(ecat_master_instance_t *inst, plugin_logger_t *logger)
 /**
  * @brief Re-apply module/port activation SDOs after the master is OPERATIONAL
  *
- * Senmun modular gateways zero their 0x8000 port configuration every time the
- * mapping is generated (every PRE-OP->SAFE-OP), so config written before OP is
- * lost.  Calling this once after OPERATIONAL re-writes the port PD lengths,
- * Master_Control (=3) and Class-A power (0x3000) so the IO-Link master port
+ * Modular gateways (e.g. Senmun) zero their port configuration -- PD lengths,
+ * Master_Control and Class-A power -- every time the mapping is generated
+ * (every PRE-OP->SAFE-OP), so config written before OP is lost.  Calling this
+ * once after OPERATIONAL re-writes those SDOs so the IO-Link master port
  * actually starts; it must not be followed by a re-mapping or the config is
  * cleared again.
+ *
+ * The set to replay is data-driven: entries the Editor flagged with
+ * `apply_after_operational` (module CoE InitCmds).  Configs that predate the
+ * flag fall back to the legacy 0x8000-family / 0x3000 heuristic.
  *
  * @return 0 on success, -1 on fatal error (failures are logged, not fatal)
  */

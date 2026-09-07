@@ -1059,21 +1059,46 @@ int ecat_master_apply_module_activation(ecat_master_instance_t *inst, plugin_log
         if (pos < 1 || pos > inst->ecx_context.slavecount)
             continue;
 
-        /* Keep only the port/module activation entries: 0x8000-family PD
-         * length / Master_Control subs and the 0x3000 Class-A power object.
-         * These must NOT be cleared by a later re-mapping, so they are written
-         * once, after OPERATIONAL. */
+        /* Module/port activation set.  The editor marks exactly the entries a
+         * modular gateway clears on every mapping regeneration (port PD
+         * lengths / Master_Control 0x8000-family and 0x3000 Class-A power),
+         * so those must be written once, after OPERATIONAL.
+         *
+         * When a slave carries no flagged entries at all we fall back to the
+         * legacy index heuristic -- configs generated before the editor
+         * started emitting the marker keep working unchanged.  A mix (some
+         * flagged, some not) only replays the flagged ones: that is the
+         * editor-authored intent, and an operator's device-level startup SDOs
+         * (e.g. a 0x8000 object they tuned by hand) must not be rewritten. */
+        bool any_flagged = false;
+        for (int k = 0; k < slave->sdo_count; k++) {
+            if (slave->sdo_configs[k].apply_after_operational) {
+                any_flagged = true;
+                break;
+            }
+        }
+
         ecat_sdo_config_t act[64];
         int n = 0;
         for (int k = 0; k < slave->sdo_count && n < (int)(sizeof(act) / sizeof(act[0])); k++) {
             const ecat_sdo_config_t *s = &slave->sdo_configs[k];
-            char *eend                 = NULL;
-            unsigned long idx          = strtoul(s->index, &eend, 16);
+            if (any_flagged) {
+                if (!s->apply_after_operational)
+                    continue;
+                act[n++] = *s;
+                continue;
+            }
+
+            /* Legacy fallback: replay entries matching the historical
+             * module-activation shape (0x8000-family PD length / Master
+             * Control subs and the 0x3000 Class-A power object). */
+            char *eend        = NULL;
+            unsigned long idx = strtoul(s->index, &eend, 16);
             if (eend == s->index || idx == 0 || idx > 0xFFFF)
                 continue;
             bool is_port_cfg = idx >= 0x8000 && idx < 0x9000 &&
                                (s->subindex == 0x24 || s->subindex == 0x25 || s->subindex == 0x28);
-            bool is_power    = idx == 0x3000;
+            bool is_power = idx == 0x3000;
             if (is_port_cfg || is_power)
                 act[n++] = *s;
         }
@@ -1083,8 +1108,8 @@ int ecat_master_apply_module_activation(ecat_master_instance_t *inst, plugin_log
         int rc = ecat_master_write_sdos(inst, pos, act, n, slave->timeouts.sdo_timeout_ms, logger);
         plugin_logger_info(logger,
                            "Slave %d (%s): applied %d module activation SDO(s) after OPERATIONAL "
-                           "(rc=%d)",
-                           pos, slave->name, n, rc);
+                           "(%s, rc=%d)",
+                           pos, slave->name, n, any_flagged ? "flagged" : "legacy", rc);
     }
     return 0;
 }

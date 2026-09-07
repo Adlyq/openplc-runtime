@@ -108,6 +108,8 @@ typedef struct {
     double value;                 /* stored as double; cast to target type at write time */
     ecat_data_type_t parsed_type; /* resolved from data_type string in JSON */
     bool best_effort;             /* type inferred from bit_length; failed write not fatal */
+    bool apply_after_operational; /* module/port activation SDO: (re)write once the bus is
+                                     OPERATIONAL (gateways clear it on mapping regeneration) */
     char name[ECAT_MAX_NAME_LEN];
 } ecat_sdo_config_t;
 

@@ -570,6 +570,14 @@ static int parse_sdo(const cJSON *sdo_json, ecat_sdo_config_t *sdo)
     }
 
     safe_strcpy(sdo->name, get_string(sdo_json, "name", ""), sizeof(sdo->name));
+
+    /* apply_after_operational: optional, default false.  Module/port
+     * activation SDOs set it so the master re-writes them once the bus is
+     * OPERATIONAL (Senmun-style gateways clear them on every mapping
+     * regeneration).  The editor emits it only on module-derived entries. */
+    const cJSON *ao = cJSON_GetObjectItemCaseSensitive(sdo_json, "apply_after_operational");
+    sdo->apply_after_operational = (ao != NULL && cJSON_IsTrue(ao)) ? true : false;
+
     return ECAT_CONFIG_OK;
 }
 

@@ -409,3 +409,92 @@ void test_sdo_parse_PadDataType_ShouldReject(void)
 
     cleanup_temp();
 }
+
+/* ---- apply_after_operational flag ---- */
+
+/**
+ * Write a single-SDO JSON config with an explicit "apply_after_operational"
+ * JSON value (true / false / omitted handled by a NULL token).
+ */
+static int write_sdo_json_flag(const char *flag_token)
+{
+    FILE *fp = fopen(TEMP_FILE, "w");
+    if (!fp)
+        return -1;
+
+    fprintf(fp,
+            "[{\n"
+            "  \"name\": \"test\",\n"
+            "  \"protocol\": \"ETHERCAT\",\n"
+            "  \"config\": {\n"
+            "    \"master\": { \"interface\": \"eth0\", \"cycle_time_us\": 1000, "
+            "\"receive_timeout_us\": 2000 },\n"
+            "    \"slaves\": [{\n"
+            "      \"position\": 1,\n"
+            "      \"name\": \"TestSlave\",\n"
+            "      \"type\": \"coupler\",\n"
+            "      \"vendor_id\": \"0x00000002\",\n"
+            "      \"product_code\": \"0x00000001\",\n"
+            "      \"revision\": \"0x00000001\",\n"
+            "      \"channels\": [],\n"
+            "      \"sdo_configurations\": [{\n"
+            "        \"index\": \"0x8000\",\n"
+            "        \"subindex\": 37,\n"
+            "        \"value\": 3,\n"
+            "        \"data_type\": \"UINT32\",\n"
+            "        \"name\": \"MasterControl\",\n"
+            "        %s\n"
+            "      }],\n"
+            "      \"rx_pdos\": [],\n"
+            "      \"tx_pdos\": []\n"
+            "    }],\n"
+            "    \"diagnostics\": {}\n"
+            "  }\n"
+            "}]\n",
+            flag_token ? flag_token : "\"apply_after_operational\": false");
+
+    fclose(fp);
+    return 0;
+}
+
+void test_sdo_parse_ApplyAfterOperationalTrue_ShouldStoreFlag(void)
+{
+    write_sdo_json_flag("\"apply_after_operational\": true");
+
+    static ecat_config_t config;
+    int rc = ecat_config_parse(TEMP_FILE, &config);
+
+    TEST_ASSERT_EQUAL_INT(ECAT_CONFIG_OK, rc);
+    TEST_ASSERT_EQUAL_INT(1, config.slaves[0].sdo_count);
+    TEST_ASSERT_TRUE(config.slaves[0].sdo_configs[0].apply_after_operational);
+
+    cleanup_temp();
+}
+
+void test_sdo_parse_ApplyAfterOperationalFalse_ShouldStoreClearFlag(void)
+{
+    write_sdo_json_flag("\"apply_after_operational\": false");
+
+    static ecat_config_t config;
+    int rc = ecat_config_parse(TEMP_FILE, &config);
+
+    TEST_ASSERT_EQUAL_INT(ECAT_CONFIG_OK, rc);
+    TEST_ASSERT_FALSE(config.slaves[0].sdo_configs[0].apply_after_operational);
+
+    cleanup_temp();
+}
+
+void test_sdo_parse_ApplyAfterOperationalMissing_ShouldDefaultToFalse(void)
+{
+    /* Same as write_sdo_json_flag(NULL): a legacy config without the key must
+     * keep behaving as before (activation decided by the index fallback). */
+    write_sdo_json_flag(NULL);
+
+    static ecat_config_t config;
+    int rc = ecat_config_parse(TEMP_FILE, &config);
+
+    TEST_ASSERT_EQUAL_INT(ECAT_CONFIG_OK, rc);
+    TEST_ASSERT_FALSE(config.slaves[0].sdo_configs[0].apply_after_operational);
+
+    cleanup_temp();
+}
